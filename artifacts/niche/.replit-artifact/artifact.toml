@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Niche"
+version = "1.0.0"
+id = "artifacts/niche"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23906
+
+[services.development]
+run = "pnpm --filter @workspace/niche run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/niche", "run", "build" ]
+publicDir = "artifacts/niche/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23906"
+BASE_PATH = "/"
