@@ -6,6 +6,9 @@ import type { SpotifyTrack } from "@/lib/spotify";
 
 type Track = SpotifyTrack;
 
+const SPOTIFY_TOKEN: string | undefined =
+  import.meta.env.VITE_SPOTIFY_ACCESS_TOKEN || undefined;
+
 const GENRES = ["Pop", "Rock", "Hip-Hop", "Indie", "R&B", "Jazz"];
 const OBSCURITY_SLIDER_LABELS = ["Familiar", "A Bit Niche", "Hidden Gems"];
 const TRANSPARENT_PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
@@ -249,8 +252,6 @@ export default function Home() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [usingLiveApi, setUsingLiveApi] = useState(false);
 
-  const SPOTIFY_TOKEN = import.meta.env.VITE_SPOTIFY_ACCESS_TOKEN as string | undefined;
-
   const loadTracks = useCallback(async (genre: string, level: number) => {
     const mockKey = `${genre}-${level}`;
     const mockFallback = MOCK_DATA[mockKey] ?? MOCK_DATA["Pop-0"];
@@ -276,7 +277,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, [SPOTIFY_TOKEN]);
+  }, []);
 
   useEffect(() => {
     const genreKey = customGenre.trim() || activeGenre;
