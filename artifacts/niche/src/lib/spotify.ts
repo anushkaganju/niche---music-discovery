@@ -39,15 +39,10 @@ function getGradient(seed: string, index: number): string {
   return pool[index % pool.length];
 }
 
-interface PopularityRange {
-  min: number;
-  max: number;
-}
-
-const OBSCURITY_RANGES: PopularityRange[] = [
+const OBSCURITY_RANGES = [
   { min: 60, max: 100 },
-  { min: 20, max: 59  },
-  { min: 0,  max: 29  },
+  { min: 20, max: 59 },
+  { min: 0,  max: 29 },
 ];
 
 interface SpotifySearchTrack {
@@ -60,17 +55,15 @@ interface SpotifySearchTrack {
 }
 
 interface SpotifySearchResponse {
-  tracks: {
-    items: SpotifySearchTrack[];
-  };
+  tracks: { items: SpotifySearchTrack[] };
 }
 
-export async function fetchSpotifyRecommendations(
+export async function fetchSpotifyPool(
   genre: string,
   obscurity: number,
   accessToken: string,
-  limit = 6,
-  market = "US",
+  market = "",
+  poolSize = 50,
 ): Promise<SpotifyTrack[]> {
   const seed = GENRE_SEARCH_MAP[genre] ?? genre.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "n");
   const { min, max } = OBSCURITY_RANGES[obscurity] ?? OBSCURITY_RANGES[0];
@@ -81,9 +74,7 @@ export async function fetchSpotifyRecommendations(
     limit: "50",
   });
 
-  if (market) {
-    params.set("market", market);
-  }
+  if (market) params.set("market", market);
 
   const res = await fetch(`https://api.spotify.com/v1/search?${params.toString()}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -97,16 +88,10 @@ export async function fetchSpotifyRecommendations(
   const data = await res.json() as SpotifySearchResponse;
   const allTracks = data.tracks?.items ?? [];
 
-  const filtered = allTracks.filter(
-    t => t.popularity >= min && t.popularity <= max,
-  );
+  const filtered = allTracks.filter(t => t.popularity >= min && t.popularity <= max);
+  const source = filtered.length >= 6 ? filtered : allTracks;
 
-  const pool = filtered.length >= limit ? filtered : allTracks;
-
-  const shuffled = pool
-    .slice()
-    .sort(() => Math.random() - 0.5)
-    .slice(0, limit);
+  const shuffled = source.slice().sort(() => Math.random() - 0.5).slice(0, poolSize);
 
   return shuffled.map((track, i) => ({
     title: track.name,
