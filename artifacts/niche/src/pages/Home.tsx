@@ -1,10 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { SiSpotify } from "react-icons/si";
 import { AnimatePresence, motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 
-const MOCK_DATA: Record<string, { title: string; artist: string; gradient: string }[]> = {
+const MOCK_DATA: Record<string, { title: string; artist: string; gradient: string; albumArt?: string }[]> = {
   "Pop-0": [
     { title: "Levitating", artist: "Dua Lipa", gradient: "linear-gradient(135deg, #f8b4d9 0%, #fbc8a3 100%)" },
     { title: "Blinding Lights", artist: "The Weeknd", gradient: "linear-gradient(135deg, #ffd6e7 0%, #ffb3c6 100%)" },
@@ -98,8 +96,12 @@ const MOCK_DATA: Record<string, { title: string; artist: string; gradient: strin
 };
 
 const GENRES = ["Pop", "Rock", "Hip-Hop", "Indie", "R&B", "Jazz"];
+const OBSCURITY_LABELS = ["Familiar Territory", "Niche Territory", "Hidden Gems"];
+const OBSCURITY_SLIDER_LABELS = ["Familiar", "A Bit Niche", "Hidden Gems"];
 
-function SongCard({ song }: { song: { title: string; artist: string; gradient: string } }) {
+const TRANSPARENT_PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
+function SongCard({ song }: { song: { title: string; artist: string; gradient: string; albumArt?: string } }) {
   const [added, setAdded] = useState(false);
 
   const handleAdd = () => {
@@ -108,27 +110,50 @@ function SongCard({ song }: { song: { title: string; artist: string; gradient: s
   };
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-[hsl(var(--card-border))] flex flex-col gap-4">
-      <div 
-        className="w-full aspect-square rounded-xl"
-        style={{ background: song.gradient }}
-        data-testid={`gradient-${song.title}`}
-      />
-      <div className="flex-1">
-        <h3 className="font-bold text-gray-900 line-clamp-1" title={song.title}>{song.title}</h3>
-        <p className="text-sm text-gray-500 line-clamp-1" title={song.artist}>{song.artist}</p>
+    <div
+      className="flex flex-col"
+      style={{
+        background: "#FFFCF9",
+        borderRadius: "12px",
+        boxShadow: "0px 2px 8px 0px rgba(44,36,32,0.07), 0px 0px 0px 1px rgba(44,36,32,0.05)",
+        overflow: "hidden",
+      }}
+    >
+      <div className="relative gradient-art" style={{ aspectRatio: "1 / 1", background: song.gradient }}>
+        <img
+          src={song.albumArt ?? TRANSPARENT_PIXEL}
+          alt={`${song.title} album art`}
+          data-testid={`img-album-${song.title}`}
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ display: song.albumArt ? "block" : "none" }}
+        />
       </div>
-      <button 
-        onClick={handleAdd}
-        data-testid={`button-add-${song.title}`}
-        className="w-full py-2.5 rounded-full font-medium transition-colors text-sm"
-        style={{ 
-          backgroundColor: added ? '#3D3530' : '#C1614F',
-          color: 'white'
-        }}
-      >
-        {added ? "Added!" : "+ Add to Playlist"}
-      </button>
+      <div className="flex flex-col gap-3 p-4">
+        <div>
+          <h3
+            className="font-semibold line-clamp-1 text-[15px] leading-snug"
+            style={{ color: "#2C2420" }}
+            title={song.title}
+          >
+            {song.title}
+          </h3>
+          <p className="text-sm line-clamp-1 mt-0.5" style={{ color: "#8A7E79" }} title={song.artist}>
+            {song.artist}
+          </p>
+        </div>
+        <button
+          onClick={handleAdd}
+          data-testid={`button-add-${song.title}`}
+          className="w-full py-2.5 rounded-full text-sm font-medium transition-all duration-200"
+          style={{
+            backgroundColor: added ? "#A0503F" : "#C1614F",
+            color: "white",
+            letterSpacing: "0.01em",
+          }}
+        >
+          {added ? "✓ Added!" : "+ Add to Playlist"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -137,10 +162,11 @@ export default function Home() {
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [activeGenre, setActiveGenre] = useState("Pop");
   const [obscurity, setObscurity] = useState(0);
+  const [customGenre, setCustomGenre] = useState("");
 
   const handleConnect = () => {
     setSpotifyConnected(true);
-    setTimeout(() => setSpotifyConnected(false), 2000);
+    setTimeout(() => setSpotifyConnected(false), 2500);
   };
 
   const handleSurprise = () => {
@@ -148,46 +174,93 @@ export default function Home() {
     const randomObscurity = Math.floor(Math.random() * 3);
     setActiveGenre(randomGenre);
     setObscurity(randomObscurity);
+    setCustomGenre("");
   };
 
-  const currentSongs = MOCK_DATA[`${activeGenre}-${obscurity}`] || [];
+  const handleCustomGenreSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (customGenre.trim()) {
+      setActiveGenre(customGenre.trim());
+    }
+  };
+
+  const displayGenre = customGenre.trim() || activeGenre;
+  const currentKey = `${activeGenre}-${obscurity}`;
+  const currentSongs = MOCK_DATA[currentKey] || MOCK_DATA["Pop-0"];
 
   return (
-    <div className="min-h-[100dvh] w-full bg-[hsl(var(--background))] flex justify-center p-4 md:p-8">
-      <div className="max-w-6xl w-full flex flex-col md:flex-row gap-8 md:gap-16">
-        
-        {/* Left Panel */}
-        <div className="w-full md:w-[35%] flex flex-col gap-10">
+    <div
+      className="min-h-[100dvh] w-full"
+      style={{ background: "#FBF9F6", fontFamily: "'Inter', sans-serif" }}
+    >
+      <div className="max-w-[1200px] mx-auto px-6 py-10 md:py-14 flex flex-col md:flex-row gap-10 md:gap-16">
+
+        {/* ── Left Panel ── */}
+        <aside className="w-full md:w-[340px] flex-shrink-0 flex flex-col gap-8">
+
+          {/* Brand */}
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 tracking-tight">Niche</h1>
-            <p className="text-gray-500 mt-2 font-medium">Music made for you, not the algorithm.</p>
+            <h1
+              className="font-serif"
+              style={{
+                fontFamily: "'Playfair Display', Georgia, serif",
+                fontSize: "2.75rem",
+                fontWeight: 700,
+                lineHeight: 1,
+                color: "#2C2420",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              niche
+            </h1>
+            <p style={{ color: "#8A7E79", marginTop: "6px", fontSize: "0.9rem" }}>
+              Music made for you, not the algorithm.
+            </p>
           </div>
 
+          {/* Spotify */}
           <button
             data-testid="button-connect-spotify"
             onClick={handleConnect}
-            className="flex items-center justify-center gap-2 w-full py-3.5 rounded-full text-white font-semibold transition-transform hover:scale-[1.02] active:scale-95"
-            style={{ backgroundColor: '#1DB954' }}
+            className="flex items-center justify-center gap-2.5 w-full py-3.5 rounded-full font-semibold transition-all duration-200 hover:brightness-110 active:scale-[0.98]"
+            style={{
+              backgroundColor: "#1DB954",
+              color: "white",
+              fontSize: "0.9375rem",
+              boxShadow: "0 2px 12px rgba(29,185,84,0.30)",
+            }}
           >
-            <SiSpotify className="w-5 h-5" />
-            {spotifyConnected ? "Connected!" : "Connect Spotify"}
+            <SiSpotify size={20} />
+            {spotifyConnected ? "✓ Connected!" : "Connect Spotify"}
           </button>
 
-          <div className="space-y-4">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Start with a Vibe</h2>
-            <div className="grid grid-cols-2 gap-3">
+          {/* Genre chips */}
+          <div className="flex flex-col gap-3">
+            <p
+              className="uppercase tracking-widest"
+              style={{ fontSize: "0.7rem", fontWeight: 600, color: "#B0A49E", letterSpacing: "0.12em" }}
+            >
+              Start with a Vibe
+            </p>
+            <div className="grid grid-cols-2 gap-2.5">
               {GENRES.map(genre => {
-                const isActive = genre === activeGenre;
+                const isActive = genre === activeGenre && !customGenre.trim();
                 return (
                   <button
                     key={genre}
                     data-testid={`button-genre-${genre}`}
-                    onClick={() => setActiveGenre(genre)}
-                    className={`py-3 rounded-full font-medium transition-all ${
-                      isActive 
-                        ? "bg-[#3D3530] text-white shadow-md" 
-                        : "bg-transparent border-2 border-[#E2DDD8] text-[#3D3530] hover:border-[#3D3530]"
-                    }`}
+                    onClick={() => { setActiveGenre(genre); setCustomGenre(""); }}
+                    className="py-2.5 rounded-full font-medium transition-all duration-150 text-sm"
+                    style={isActive ? {
+                      backgroundColor: "#C1614F",
+                      color: "white",
+                      boxShadow: "0 2px 8px rgba(193,97,79,0.30)",
+                      border: "1.5px solid #C1614F",
+                    } : {
+                      backgroundColor: "transparent",
+                      color: "#3D3530",
+                      border: "1.5px solid #DDD7D1",
+                    }}
                   >
                     {genre}
                   </button>
@@ -196,55 +269,133 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="space-y-6">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">How Deep?</h2>
-            
-            <input 
-              type="range" 
-              min="0" 
-              max="2" 
+          {/* Custom genre input */}
+          <div className="flex flex-col gap-2">
+            <p
+              className="uppercase tracking-widest"
+              style={{ fontSize: "0.7rem", fontWeight: 600, color: "#B0A49E", letterSpacing: "0.12em" }}
+            >
+              Or type a custom genre
+            </p>
+            <form onSubmit={handleCustomGenreSubmit} className="flex gap-2">
+              <input
+                type="text"
+                data-testid="input-custom-genre"
+                value={customGenre}
+                onChange={e => setCustomGenre(e.target.value)}
+                placeholder="e.g. Bossa Nova, Shoegaze…"
+                className="flex-1 py-2.5 px-4 rounded-full text-sm outline-none transition-all"
+                style={{
+                  background: "#F0EBE6",
+                  border: "1.5px solid #E2DAD4",
+                  color: "#2C2420",
+                  fontFamily: "'Inter', sans-serif",
+                }}
+                onFocus={e => { e.currentTarget.style.borderColor = "#C1614F"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(193,97,79,0.12)"; }}
+                onBlur={e => { e.currentTarget.style.borderColor = "#E2DAD4"; e.currentTarget.style.boxShadow = "none"; }}
+              />
+              {customGenre.trim() && (
+                <button
+                  type="submit"
+                  data-testid="button-custom-genre-submit"
+                  className="px-4 py-2.5 rounded-full text-sm font-medium transition-all"
+                  style={{ backgroundColor: "#C1614F", color: "white" }}
+                >
+                  Go
+                </button>
+              )}
+            </form>
+          </div>
+
+          {/* Obscurity slider */}
+          <div className="flex flex-col gap-3">
+            <p
+              className="uppercase tracking-widest"
+              style={{ fontSize: "0.7rem", fontWeight: 600, color: "#B0A49E", letterSpacing: "0.12em" }}
+            >
+              How Deep?
+            </p>
+            <input
+              type="range"
+              min="0"
+              max="2"
               step="1"
               value={obscurity}
-              onChange={(e) => setObscurity(Number(e.target.value))}
+              onChange={e => setObscurity(Number(e.target.value))}
               className="custom-range"
               data-testid="slider-obscurity"
               style={{
-                background: `linear-gradient(to right, #3D3530 ${(obscurity / 2) * 100}%, var(--color-input) ${(obscurity / 2) * 100}%)`
+                background: `linear-gradient(to right, #C1614F ${(obscurity / 2) * 100}%, #E2DAD4 ${(obscurity / 2) * 100}%)`
               }}
             />
-
-            <div className="flex justify-between text-xs font-medium text-gray-500">
-              <span className={obscurity === 0 ? "text-[#3D3530]" : ""}>Familiar</span>
-              <span className={obscurity === 1 ? "text-[#3D3530]" : ""}>A Bit Niche</span>
-              <span className={obscurity === 2 ? "text-[#3D3530]" : ""}>Hidden Gems</span>
+            <div className="flex justify-between">
+              {OBSCURITY_SLIDER_LABELS.map((label, i) => (
+                <span
+                  key={label}
+                  style={{
+                    fontSize: "0.75rem",
+                    fontWeight: obscurity === i ? 600 : 400,
+                    color: obscurity === i ? "#C1614F" : "#B0A49E",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {label}
+                </span>
+              ))}
             </div>
           </div>
 
+          {/* Surprise Me */}
           <button
             data-testid="button-surprise"
             onClick={handleSurprise}
-            className="w-full py-4 rounded-2xl bg-white border-2 border-[#E2DDD8] text-[#3D3530] font-bold hover:bg-gray-50 transition-colors mt-auto"
+            className="w-full py-3.5 rounded-2xl font-semibold transition-all duration-150 hover:brightness-[0.97] active:scale-[0.98] text-sm tracking-wide"
+            style={{
+              background: "#FFFFFF",
+              border: "1.5px solid #DDD7D1",
+              color: "#3D3530",
+              boxShadow: "0 1px 4px rgba(44,36,32,0.06)",
+              letterSpacing: "0.02em",
+            }}
           >
-            Surprise Me 🎲
+            ✦ Surprise Me
           </button>
-        </div>
+        </aside>
 
-        {/* Right Panel */}
-        <div className="w-full md:w-[65%] flex flex-col pt-4 md:pt-0">
+        {/* ── Right Panel ── */}
+        <main className="flex-1 flex flex-col">
           <div className="mb-8">
-            <h2 className="text-3xl font-bold text-gray-900">Your Fresh Finds</h2>
-            <p className="text-gray-500 mt-2 text-lg">Based on your taste in <span className="font-semibold text-[#3D3530]">{activeGenre}</span></p>
+            <h2
+              style={{
+                fontFamily: "'Playfair Display', Georgia, serif",
+                fontSize: "2.25rem",
+                fontWeight: 700,
+                color: "#2C2420",
+                lineHeight: 1.1,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              Your Fresh Finds
+            </h2>
+            <p style={{ color: "#8A7E79", marginTop: "8px", fontSize: "0.9375rem" }}>
+              Digging into{" "}
+              <span style={{ color: "#2C2420", fontWeight: 600 }}>{displayGenre}</span>
+              {" "}
+              <span style={{ color: "#C1614F" }}>•</span>
+              {" "}
+              <span style={{ color: "#8A7E79" }}>{OBSCURITY_LABELS[obscurity]}</span>
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             <AnimatePresence mode="popLayout">
               {currentSongs.map((song, idx) => (
                 <motion.div
                   key={`${song.title}-${song.artist}-${idx}`}
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.3, delay: idx * 0.1 }}
+                  exit={{ opacity: 0, scale: 0.96 }}
+                  transition={{ duration: 0.28, delay: idx * 0.07, ease: [0.22, 1, 0.36, 1] }}
                   layout
                 >
                   <SongCard song={song} />
@@ -252,7 +403,7 @@ export default function Home() {
               ))}
             </AnimatePresence>
           </div>
-        </div>
+        </main>
 
       </div>
     </div>
