@@ -1,8 +1,17 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { SiSpotify } from "react-icons/si";
 import { AnimatePresence, motion } from "framer-motion";
 import { fetchSpotifyRecommendations, obscurityLabel } from "@/lib/spotify";
 import type { SpotifyTrack } from "@/lib/spotify";
+import {
+  initiateSpotifyAuth,
+  handleOAuthCallback,
+  getStoredToken,
+  getValidToken,
+  hasClientId,
+  isAuthenticated,
+  clearAuth,
+} from "@/lib/spotifyAuth";
 
 type Track = SpotifyTrack;
 
@@ -12,6 +21,15 @@ const SPOTIFY_TOKEN: string | undefined =
 const GENRES = ["Pop", "Rock", "Hip-Hop", "Indie", "R&B", "Jazz"];
 const OBSCURITY_SLIDER_LABELS = ["Familiar", "A Bit Niche", "Hidden Gems"];
 const TRANSPARENT_PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
+const MARKETS = [
+  { label: "Global (All)", value: "" },
+  { label: "India (Hindi / Regional)", value: "IN" },
+  { label: "United States / UK (English)", value: "US" },
+  { label: "South Korea (K-Pop)", value: "KR" },
+  { label: "Japan (J-Pop / City Pop)", value: "JP" },
+  { label: "Latin America (Spanish)", value: "MX" },
+];
 
 const MOCK_DATA: Record<string, Track[]> = {
   "Pop-0": [
@@ -185,7 +203,6 @@ function SongCard({ song }: { song: Track }) {
         <img
           src={song.albumArt ?? TRANSPARENT_PIXEL}
           alt={`${song.title} album art`}
-          data-testid={`img-album-${song.title}`}
           className="absolute inset-0 w-full h-full object-cover"
           style={{ display: song.albumArt ? "block" : "none" }}
         />
@@ -205,7 +222,6 @@ function SongCard({ song }: { song: Track }) {
         </div>
         <button
           onClick={handleAdd}
-          data-testid={`button-add-${song.title}`}
           className="w-full py-2.5 rounded-full text-sm font-medium transition-all duration-200"
           style={{
             backgroundColor: added ? "#A0503F" : "#C1614F",
@@ -243,20 +259,51 @@ function SkeletonCard() {
 }
 
 export default function Home() {
-  const [spotifyConnected, setSpotifyConnected] = useState(false);
-  const [activeGenre, setActiveGenre] = useState("Pop");
-  const [obscurity, setObscurity] = useState(0);
-  const [customGenre, setCustomGenre] = useState("");
-  const [tracks, setTracks] = useState<Track[]>(MOCK_DATA["Pop-0"]);
-  const [loading, setLoading] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
+  const [oauthToken, setOauthToken]     = useState<string | null>(() => getStoredToken());
+  const [oauthAuthed, setOauthAuthed]   = useState(() => isAuthenticated());
+  const [activeGenre, setActiveGenre]   = useState("Pop");
+  const [obscurity, setObscurity]       = useState(0);
+  const [customGenre, setCustomGenre]   = useState("");
+  const [market, setMarket]             = useState("US");
+  const [tracks, setTracks]             = useState<Track[]>(MOCK_DATA["Pop-0"]);
+  const [loading, setLoading]           = useState(false);
+  const [apiError, setApiError]         = useState<string | null>(null);
   const [usingLiveApi, setUsingLiveApi] = useState(false);
+  const callbackHandled = useRef(false);
 
-  const loadTracks = useCallback(async (genre: string, level: number) => {
+  const activeToken = oauthToken ?? SPOTIFY_TOKEN;
+
+  useEffect(() => {
+    if (callbackHandled.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (!code) return;
+    callbackHandled.current = true;
+
+    handleOAuthCallback(code).then(token => {
+      if (token) {
+        setOauthToken(token);
+        setOauthAuthed(true);
+      }
+      window.history.replaceState({}, "", window.location.pathname);
+    });
+  }, []);
+
+  const loadTracks = useCallback(async (genre: string, level: number, mkt: string) => {
     const mockKey = `${genre}-${level}`;
     const mockFallback = MOCK_DATA[mockKey] ?? MOCK_DATA["Pop-0"];
 
-    if (!SPOTIFY_TOKEN) {
+    let token = activeToken;
+
+    if (oauthAuthed) {
+      const refreshed = await getValidToken();
+      if (refreshed) {
+        token = refreshed;
+        setOauthToken(refreshed);
+      }
+    }
+
+    if (!token) {
       setTracks(mockFallback);
       setUsingLiveApi(false);
       setApiError(null);
@@ -266,7 +313,7 @@ export default function Home() {
     setLoading(true);
     setApiError(null);
     try {
-      const live = await fetchSpotifyRecommendations(genre, level, SPOTIFY_TOKEN, 6);
+      const live = await fetchSpotifyRecommendations(genre, level, token, 6, mkt || "US");
       setTracks(live);
       setUsingLiveApi(true);
     } catch (err) {
@@ -277,16 +324,29 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeToken, oauthAuthed]);
 
   useEffect(() => {
     const genreKey = customGenre.trim() || activeGenre;
-    loadTracks(genreKey, obscurity);
-  }, [activeGenre, obscurity, customGenre, loadTracks]);
+    loadTracks(genreKey, obscurity, market);
+  }, [activeGenre, obscurity, customGenre, market, loadTracks]);
 
-  const handleConnect = () => {
-    setSpotifyConnected(true);
-    setTimeout(() => setSpotifyConnected(false), 2500);
+  const handleConnect = async () => {
+    if (!hasClientId()) {
+      alert("VITE_SPOTIFY_CLIENT_ID is not configured. Add it as a Replit secret to enable OAuth login.");
+      return;
+    }
+    try {
+      await initiateSpotifyAuth();
+    } catch (e) {
+      console.error("Auth initiation failed:", e);
+    }
+  };
+
+  const handleDisconnect = () => {
+    clearAuth();
+    setOauthToken(null);
+    setOauthAuthed(false);
   };
 
   const handleSurprise = () => {
@@ -302,6 +362,7 @@ export default function Home() {
   };
 
   const displayGenre = customGenre.trim() || activeGenre;
+  const marketLabel = MARKETS.find(m => m.value === market)?.label ?? "Global (All)";
 
   return (
     <div
@@ -335,33 +396,53 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Spotify */}
-          <button
-            data-testid="button-connect-spotify"
-            onClick={handleConnect}
-            className="flex items-center justify-center gap-2.5 w-full py-3.5 rounded-full font-semibold transition-all duration-200 hover:brightness-110 active:scale-[0.98]"
-            style={{
-              backgroundColor: "#1DB954",
-              color: "white",
-              fontSize: "0.9375rem",
-              boxShadow: "0 2px 12px rgba(29,185,84,0.28)",
-            }}
-          >
-            <SiSpotify size={20} />
-            {spotifyConnected ? "✓ Connected!" : "Connect Spotify"}
-          </button>
+          {/* Spotify connect / disconnect */}
+          {oauthAuthed ? (
+            <div className="flex flex-col gap-2">
+              <div
+                className="flex items-center gap-2 px-4 py-3 rounded-full"
+                style={{ background: "#EDF7ED", border: "1.5px solid #A5D6A7" }}
+              >
+                <SiSpotify size={16} color="#2E7D32" />
+                <span style={{ color: "#2E7D32", fontSize: "0.875rem", fontWeight: 500 }}>
+                  Spotify Connected
+                </span>
+              </div>
+              <button
+                onClick={handleDisconnect}
+                className="text-xs underline transition-opacity hover:opacity-70 text-left"
+                style={{ color: "#B0A49E" }}
+              >
+                Disconnect
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleConnect}
+              className="flex items-center justify-center gap-2.5 w-full py-3.5 rounded-full font-semibold transition-all duration-200 hover:brightness-110 active:scale-[0.98]"
+              style={{
+                backgroundColor: "#1DB954",
+                color: "white",
+                fontSize: "0.9375rem",
+                boxShadow: "0 2px 12px rgba(29,185,84,0.28)",
+              }}
+            >
+              <SiSpotify size={20} />
+              Connect Spotify
+            </button>
+          )}
 
           {/* Live API badge */}
-          {usingLiveApi && (
+          {usingLiveApi && !oauthAuthed && (
             <div style={{ background: "#EDF7ED", border: "1px solid #A5D6A7", borderRadius: "8px", padding: "8px 12px" }}>
               <p style={{ color: "#2E7D32", fontSize: "0.75rem", fontWeight: 500 }}>
-                ✓ Live Spotify recommendations active
+                ✓ Live Spotify data active
               </p>
             </div>
           )}
           {apiError && (
             <div style={{ background: "#FFF3E0", border: "1px solid #FFCC80", borderRadius: "8px", padding: "8px 12px" }}>
-              <p style={{ color: "#E65100", fontSize: "0.75rem" }}>Spotify API error — showing mock data</p>
+              <p style={{ color: "#E65100", fontSize: "0.75rem" }}>Spotify API error — showing curated data</p>
             </div>
           )}
 
@@ -379,7 +460,6 @@ export default function Home() {
                 return (
                   <button
                     key={genre}
-                    data-testid={`button-genre-${genre}`}
                     onClick={() => { setActiveGenre(genre); setCustomGenre(""); }}
                     className="py-2.5 rounded-full font-medium transition-all duration-150 text-sm"
                     style={isActive ? {
@@ -411,7 +491,6 @@ export default function Home() {
             <form onSubmit={handleCustomGenreSubmit} className="flex gap-2">
               <input
                 type="text"
-                data-testid="input-custom-genre"
                 value={customGenre}
                 onChange={e => setCustomGenre(e.target.value)}
                 placeholder="e.g. Bossa Nova, Shoegaze…"
@@ -434,7 +513,6 @@ export default function Home() {
               {customGenre.trim() && (
                 <button
                   type="submit"
-                  data-testid="button-custom-genre-submit"
                   className="px-4 py-2.5 rounded-full text-sm font-medium transition-all active:scale-95"
                   style={{ backgroundColor: "#C1614F", color: "white" }}
                 >
@@ -442,6 +520,51 @@ export default function Home() {
                 </button>
               )}
             </form>
+          </div>
+
+          {/* ── Market / Region selector ── */}
+          <div className="flex flex-col gap-2">
+            <p
+              className="uppercase tracking-widest"
+              style={{ fontSize: "0.68rem", fontWeight: 600, color: "#B0A49E", letterSpacing: "0.13em" }}
+            >
+              Select Region / Language
+            </p>
+            <div className="relative">
+              <select
+                value={market}
+                onChange={e => setMarket(e.target.value)}
+                className="w-full appearance-none py-2.5 pl-4 pr-10 rounded-full text-sm outline-none transition-all cursor-pointer"
+                style={{
+                  background: "#F0EBE6",
+                  border: "1.5px solid #E2DAD4",
+                  color: "#2C2420",
+                  fontFamily: "'Inter', sans-serif",
+                  boxShadow: "0 1px 3px rgba(44,36,32,0.05)",
+                }}
+                onFocus={e => {
+                  e.currentTarget.style.borderColor = "#C1614F";
+                  e.currentTarget.style.boxShadow = "0 0 0 3px rgba(193,97,79,0.12)";
+                }}
+                onBlur={e => {
+                  e.currentTarget.style.borderColor = "#E2DAD4";
+                  e.currentTarget.style.boxShadow = "0 1px 3px rgba(44,36,32,0.05)";
+                }}
+              >
+                {MARKETS.map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+              {/* Custom chevron */}
+              <span
+                className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2"
+                style={{ color: "#B0A49E" }}
+              >
+                <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
+                  <path d="M1 1L6 6.5L11 1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </span>
+            </div>
           </div>
 
           {/* Obscurity slider */}
@@ -460,7 +583,6 @@ export default function Home() {
               value={obscurity}
               onChange={e => setObscurity(Number(e.target.value))}
               className="custom-range"
-              data-testid="slider-obscurity"
               style={{
                 background: `linear-gradient(to right, #C1614F ${(obscurity / 2) * 100}%, #E2DAD4 ${(obscurity / 2) * 100}%)`
               }}
@@ -484,7 +606,6 @@ export default function Home() {
 
           {/* Surprise Me */}
           <button
-            data-testid="button-surprise"
             onClick={handleSurprise}
             className="w-full py-3.5 rounded-2xl font-semibold transition-all duration-150 hover:brightness-[0.97] active:scale-[0.98] text-sm"
             style={{
@@ -521,6 +642,10 @@ export default function Home() {
               <span style={{ color: "#C1614F" }}>•</span>
               {" "}
               <span>{obscurityLabel(obscurity)}</span>
+              {" "}
+              <span style={{ color: "#C1614F" }}>•</span>
+              {" "}
+              <span>{marketLabel}</span>
             </p>
           </div>
 

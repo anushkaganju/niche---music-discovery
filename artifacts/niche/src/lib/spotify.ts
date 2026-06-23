@@ -70,6 +70,7 @@ export async function fetchSpotifyRecommendations(
   obscurity: number,
   accessToken: string,
   limit = 6,
+  market = "US",
 ): Promise<SpotifyTrack[]> {
   const seed = GENRE_SEARCH_MAP[genre] ?? genre.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "n");
   const { min, max } = OBSCURITY_RANGES[obscurity] ?? OBSCURITY_RANGES[0];
@@ -78,8 +79,11 @@ export async function fetchSpotifyRecommendations(
     q: `genre:"${seed}"`,
     type: "track",
     limit: "50",
-    market: "US",
   });
+
+  if (market) {
+    params.set("market", market);
+  }
 
   const res = await fetch(`https://api.spotify.com/v1/search?${params.toString()}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -116,8 +120,4 @@ export async function fetchSpotifyRecommendations(
 
 export function obscurityLabel(level: number): string {
   return ["Familiar Territory", "Niche Territory", "Hidden Gems"][level] ?? "Familiar Territory";
-}
-
-export function maxPopularityForLevel(level: number): number {
-  return OBSCURITY_RANGES[level]?.max ?? 100;
 }
