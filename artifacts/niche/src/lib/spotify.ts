@@ -122,10 +122,7 @@ function buildQuery(genre: string, language: string): string {
   const seed =
     GENRE_SEARCH_MAP[genre] ??
     genre.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "n");
-  const langPart =
-    language && language !== "All" && language !== "English"
-      ? ` "${language}"`
-      : "";
+  const langPart = language && language !== "All" ? ` "${language}"` : "";
   return `genre:"${seed}"${langPart}`;
 }
 
