@@ -54,8 +54,8 @@ export async function initiateSpotifyAuth(): Promise<void> {
     code_challenge: challenge,
   });
 
-  // ✅ FIXED: Clean single '$' template injection format
-  window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`;
+  // ✅ FIXED: Swapped out proxy string for the official, direct Spotify accounts authorization endpoint
+  window.location.href = `https://accounts.spotify.com/authorize?$${params.toString()}`;
 }
 
 interface TokenResponse {
