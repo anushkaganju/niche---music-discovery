@@ -26,6 +26,42 @@ const GENRE_SEARCH_MAP: Record<string, string> = {
   Jazz: "jazz",
 };
 
+// ── NEW: HAND-CURATED PLAYLIST MAP ──────────────────────────────────────────
+// Hardcoded playlist IDs mapped by [Genre]-[Obscurity Level]-[Optional Language]
+const CURATED_PLAYLISTS: Record<string, string> = {
+  // Indie — general
+  "Indie-0": "3V5BrJv7p0rfkO1X7NzLOv", // Familiar
+  "Indie-1": "15cPTUnMcVg95MKR8ukLu2", // Niche
+  "Indie-2": "4xAVUOlDPVReVZIjeOmO55", // Hidden Gems
+
+  // Indie — Hindi-specific
+  "Indie-0-Hindi": "7AexoOofx2Sx8YYTWfWdLj",
+  "Indie-1-Hindi": "5xugE6eBfTfZ2irkcdY8Qw",
+  "Indie-2-Hindi": "4xAVUOlDPVReVZIjeOmO55", // Same as Indie-2 general
+
+  // Pop — general
+  "Pop-0": "5tqpfFWqH2fQHVcQacxSUM", // Familiar
+  "Pop-1": "44hUsnbEMWLPGRJQz2fU77", // Niche
+  "Pop-2": "40C3boyV3eJ2UkKQJPacQh", // Hidden Gems
+};
+
+/**
+ * Tries to find a custom curated playlist key, otherwise returns null for live search fallback.
+ */
+function getCuratedPlaylistId(
+  genre: string,
+  obscurity: number,
+  language: string,
+): string | null {
+  const languageKey =
+    language && language !== "All" ? `${genre}-${obscurity}-${language}` : null;
+  if (languageKey && CURATED_PLAYLISTS[languageKey]) {
+    return CURATED_PLAYLISTS[languageKey];
+  }
+  const generalKey = `${genre}-${obscurity}`;
+  return CURATED_PLAYLISTS[generalKey] ?? null;
+}
+
 const GENRE_GRADIENT_POOL: Record<string, string[]> = {
   pop: [
     "linear-gradient(135deg,#f8b4d9 0%,#fbc8a3 100%)",
@@ -113,15 +149,6 @@ interface SpotifySearchResponse {
   error?: { status: number; message: string };
 }
 
-/**
- * Build a Spotify search query string combining genre seed and an optional
- * language hint. Format follows the user-visible q= convention:
- *   genre:"pop" "Hindi"
- *
- * NOTE: "English" used to be treated the same as "All" (i.e. no filter at
- * all), which is why English-only searches were returning non-English
- * tracks. Only "All" should skip the language hint now.
- */
 function buildQuery(genre: string, language: string): string {
   const seed =
     GENRE_SEARCH_MAP[genre] ??
@@ -130,25 +157,25 @@ function buildQuery(genre: string, language: string): string {
   return `genre:"${seed}"${langPart}`;
 }
 
-/**
- * Fetch a randomised pool of Spotify tracks for the given params.
- *
- * NOTE: Spotify's /v1/search endpoint rejects limit=50 for this app/query
- * combination with a misleading "Invalid limit" 400. Confirmed via direct
- * curl testing that limit=10 works reliably. To still get a decent-sized
- * pool for the obscurity filter to work with, we page through several
- * limit=10 requests and merge the results instead of requesting a bigger
- * limit in one call.
- *
- * NOTE: preview_url is no longer required/guaranteed by Spotify for most
- * third-party apps, so tracks are no longer filtered on its presence.
- * Cards without a preview simply skip the hover-to-play UI and rely on
- * the "Open in Spotify" link instead.
- *
- * Throws SpotifyAuthError on 401/403 so callers can handle auth state.
- * Throws Error on other non-ok responses (unless it's a later page running
- * out of results, in which case we just stop paging).
- */
+// Helper to pull items directly out of your handcrafted curated playlists
+async function fetchTracksFromPlaylist(
+  playlistId: string,
+  accessToken: string,
+): Promise<SpotifySearchTrack[]> {
+  const url = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (res.status === 401 || res.status === 403)
+    throw new SpotifyAuthError(res.status);
+  if (!res.ok) return [];
+
+  const data = (await res.json()) as {
+    items: Array<{ track: SpotifySearchTrack }>;
+  };
+  return (data.items ?? []).map((item) => item.track).filter(Boolean);
+}
+
 export async function fetchSpotifyPool(
   genre: string,
   obscurity: number,
@@ -159,65 +186,68 @@ export async function fetchSpotifyPool(
   const seed =
     GENRE_SEARCH_MAP[genre] ??
     genre.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "n");
-  const { min, max } = OBSCURITY_RANGES[obscurity] ?? OBSCURITY_RANGES[0];
-  const q = buildQuery(genre, language);
-
-  const SEARCH_LIMIT = 10;
-  const PAGES = 4; // up to 4 * 10 = 40 tracks pooled per search
-  const baseOffset = Math.floor(offset || 0);
 
   let all: SpotifySearchTrack[] = [];
+  const curatedId = getCuratedPlaylistId(genre, obscurity, language);
 
-  for (let p = 0; p < PAGES; p++) {
-    const pageOffset = baseOffset + p * SEARCH_LIMIT;
-    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=${SEARCH_LIMIT}&offset=${pageOffset}`;
+  // STRATEGY: Use curated playlist if available, otherwise fallback to custom search pagination
+  if (curatedId) {
+    all = await fetchTracksFromPlaylist(curatedId, accessToken);
+  } else {
+    const q = buildQuery(genre, language);
+    const SEARCH_LIMIT = 10;
+    const PAGES = 4;
+    const baseOffset = Math.floor(offset || 0);
 
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    for (let p = 0; p < PAGES; p++) {
+      const pageOffset = baseOffset + p * SEARCH_LIMIT;
+      const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=${SEARCH_LIMIT}&offset=${pageOffset}`;
 
-    if (res.status === 401 || res.status === 403) {
-      throw new SpotifyAuthError(res.status);
-    }
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
 
-    if (!res.ok) {
-      const body = await res.text();
-      // If the FIRST page fails, surface the error as before.
-      // If a LATER page fails (e.g. we paged past the end of results),
-      // just stop paging and use whatever we've already collected.
-      if (p === 0) {
-        throw new Error(`Spotify Search ${res.status}: ${body}`);
+      if (res.status === 401 || res.status === 403)
+        throw new SpotifyAuthError(res.status);
+      if (!res.ok) {
+        if (p === 0) {
+          const body = await res.text();
+          throw new Error(`Spotify Search ${res.status}: ${body}`);
+        }
+        break;
       }
-      break;
+
+      const data = (await res.json()) as SpotifySearchResponse;
+      const items = data.tracks?.items ?? [];
+      all = all.concat(items);
+      if (items.length < SEARCH_LIMIT) break;
     }
-
-    const data = (await res.json()) as SpotifySearchResponse;
-    const items = data.tracks?.items ?? [];
-    all = all.concat(items);
-
-    if (items.length < SEARCH_LIMIT) break; // no more results to page through
   }
 
-  // Only require album art now — preview_url is no longer guaranteed by Spotify
-  const valid = all.filter((t) => t.album.images.length > 0);
-
-  // Apply obscurity filter on valid tracks; fall back to all valid if too few
-  const withObscurity = valid.filter(
-    (t) => t.popularity >= min && t.popularity <= max,
+  // Filter track list for valid items with artwork assets
+  const valid = all.filter(
+    (t) => t.album && t.album.images && t.album.images.length > 0,
   );
-  const source = withObscurity.length >= 4 ? withObscurity : valid;
 
-  // Shuffle and let caller slice further
+  // Trust custom curation choices directly; only run live ranking range loops on search metrics
+  const withObscurity = curatedId
+    ? valid
+    : valid.filter((t) => {
+        const { min, max } = OBSCURITY_RANGES[obscurity] ?? OBSCURITY_RANGES[0];
+        return t.popularity >= min && t.popularity <= max;
+      });
+
+  const source = withObscurity.length >= 4 ? withObscurity : valid;
   const shuffled = source.slice().sort(() => Math.random() - 0.5);
 
   return shuffled.map((track, i) => ({
     title: track.name,
     artist: track.artists.map((a) => a.name).join(", "),
-    albumArt: track.album.images[0].url, // guaranteed to exist after filter
+    albumArt: track.album.images[0].url,
     spotifyId: track.id,
     spotifyUri: track.uri,
     spotifyUrl: track.external_urls.spotify,
-    previewUrl: track.preview_url ?? undefined, // optional — may be absent
+    previewUrl: track.preview_url ?? undefined,
     gradient: getGradient(seed, i),
   }));
 }
