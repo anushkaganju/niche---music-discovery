@@ -1,4 +1,7 @@
-const CLIENT_ID: string | undefined = "77f5f74668bd46a285eb2051f1938855";
+// artifacts/niche/src/lib/spotifyAuth.ts
+
+const CLIENT_ID: string = "77f5f74668bd46a285eb2051f1938855";
+
 const SCOPES = [
   "user-read-private",
   "user-read-email",
@@ -16,12 +19,12 @@ function getRedirectUri(): string {
 }
 
 function generateCodeVerifier(): string {
-  const array = new Uint8Array(96);
-  crypto.getRandomValues(array);
-  return btoa(String.fromCharCode(...array))
+  const arr = new Uint8Array(64);
+  crypto.getRandomValues(arr);
+  return btoa(String.fromCharCode(...arr))
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
-    .replace(/=/g, "");
+    .replace(/=+$/, "");
 }
 
 async function generateCodeChallenge(verifier: string): Promise<string> {
@@ -30,7 +33,7 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
   return btoa(String.fromCharCode(...new Uint8Array(digest)))
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
-    .replace(/=/g, "");
+    .replace(/=+$/, "");
 }
 
 export function hasClientId(): boolean {
@@ -38,9 +41,13 @@ export function hasClientId(): boolean {
 }
 
 export async function initiateSpotifyAuth(): Promise<void> {
-  if (!CLIENT_ID) {
-    throw new Error("VITE_SPOTIFY_CLIENT_ID is not configured.");
+  console.log("[spotifyAuth] CLIENT_ID =", JSON.stringify(CLIENT_ID));
+  console.log("[spotifyAuth] redirect_uri =", getRedirectUri());
+
+  if (!CLIENT_ID || CLIENT_ID.trim() === "") {
+    throw new Error("Spotify CLIENT_ID is empty.");
   }
+
   const verifier = generateCodeVerifier();
   const challenge = await generateCodeChallenge(verifier);
   sessionStorage.setItem(VERIFIER_KEY, verifier);
@@ -54,8 +61,8 @@ export async function initiateSpotifyAuth(): Promise<void> {
     code_challenge: challenge,
   });
 
-  // ✅ FIXED: Swapped out proxy string for the official, direct Spotify accounts authorization endpoint
-  window.location.href = `https://accounts.spotify.com/authorize?$${params.toString()}`;
+  const url = `https://accounts.spotify.com/authorize?${params.toString()}`;
+  window.location.href = url;
 }
 
 interface TokenResponse {
