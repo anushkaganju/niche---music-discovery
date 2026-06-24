@@ -26,7 +26,7 @@ const GENRE_SEARCH_MAP: Record<string, string> = {
   Jazz: "jazz",
 };
 
-// ── NEW: HAND-CURATED PLAYLIST MAP ──────────────────────────────────────────
+// ── HAND-CURATED PLAYLIST MAP ──────────────────────────────────────────
 // Hardcoded playlist IDs mapped by [Genre]-[Obscurity Level]-[Optional Language]
 const CURATED_PLAYLISTS: Record<string, string> = {
   // Indie — general
