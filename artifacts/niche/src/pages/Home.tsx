@@ -605,9 +605,10 @@ export default function Home() {
   const [obscurity, setObscurity]       = useState(0);
   const [customGenre, setCustomGenre]   = useState("");
   const [language, setLanguage]         = useState("All");
-  const [tracks, setTracks]             = useState<Track[]>(() => MOCK_DATA["Pop-0"].slice(0, PAGE_SIZE));
+  const [tracks, setTracks]             = useState<Track[]>([]);
   const [loading, setLoading]           = useState(false);
   const [apiError, setApiError]         = useState<string | null>(null);
+  const [gridStatus, setGridStatus]     = useState<"not-connected" | "empty" | "error" | null>(null);
   const [usingLiveApi, setUsingLiveApi] = useState(false);
   const [playlist, setPlaylist]         = useState<Track[]>([]);
   const [drawerOpen, setDrawerOpen]     = useState(false);
@@ -630,57 +631,58 @@ export default function Home() {
 
   // ── Fetch from Spotify with optional random offset ────────────────────────
   const fetchTracks = useCallback(async (genre: string, level: number, lang: string, offset = 0) => {
-    const mockKey = `${genre}-${level}`;
-    const mockFallback = (MOCK_DATA[mockKey] ?? MOCK_DATA["Pop-0"]).slice(0, PAGE_SIZE);
+    // Clear grid immediately so stale tracks never show under new filters
+    setTracks([]);
+    setApiError(null);
+    setGridStatus(null);
 
-    // Resolve the best available token (refresh if near-expiry)
+    // Resolve OAuth token (attempt refresh if stored but near-expiry)
     let token: string | null = null;
     if (oauthAuthed || oauthToken) {
       const refreshed = await getValidToken();
-      if (refreshed) {
-        token = refreshed;
-        setOauthToken(refreshed);
-      }
+      if (refreshed) { token = refreshed; setOauthToken(refreshed); }
     }
 
-    // No valid OAuth token → show curated picks silently, no error banner
+    // No valid token → prompt the user to connect, leave grid empty
     if (!token) {
-      setTracks(mockFallback);
+      console.log("[niche] No active Spotify token — awaiting OAuth connection.");
       setUsingLiveApi(false);
-      setApiError(null);
-      setLoading(false);
+      setGridStatus("not-connected");
       return;
     }
 
     setLoading(true);
-    setApiError(null);
     try {
       const langParam = lang === "All" || lang === "English" ? "" : lang;
+      const q = `genre:"${genre}"${langParam ? ` "${langParam}"` : ""}`;
+      console.log(`[niche] Spotify search → ${q} | offset=${offset}`);
       const pool = await fetchSpotifyPool(genre, level, token, langParam, offset);
 
       if (pool.length === 0) {
-        // Valid response but no previewable tracks — fall back silently
-        setTracks(mockFallback);
+        console.log("[niche] No previewable tracks found for this query.");
+        setGridStatus("empty");
         setUsingLiveApi(false);
       } else {
         setTracks(pool.slice(0, PAGE_SIZE));
         setUsingLiveApi(true);
-        setApiError(null);
+        setGridStatus(null);
       }
     } catch (err) {
       if (err instanceof SpotifyAuthError) {
-        // Token rejected — clear auth state, show curated picks, NO error banner
+        // Token rejected by Spotify — clear session, prompt reconnect
+        console.log("[niche] Spotify rejected token (401/403) — clearing auth.");
         clearAuth();
         setOauthToken(null);
         setOauthAuthed(false);
-        setTracks(mockFallback);
         setUsingLiveApi(false);
-        setApiError(null);
+        setGridStatus("not-connected");
       } else {
-        // Genuine unexpected API error (5xx, rate limit, network, etc.)
-        setApiError("Spotify API error — showing curated picks");
-        setTracks(mockFallback);
+        // Unexpected API error (5xx, rate limit, network)
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[niche] Spotify API error:", msg);
+        setApiError(msg);
         setUsingLiveApi(false);
+        setGridStatus("error");
       }
     } finally {
       setLoading(false);
@@ -942,31 +944,96 @@ export default function Home() {
           </div>
 
           {/* Grid: 2 cols mobile, 5 cols tablet+ */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
-            {loading
-              ? Array.from({ length: PAGE_SIZE }).map((_, i) => <SkeletonCard key={i} C={C} />)
-              : (
-                <AnimatePresence mode="popLayout">
-                  {tracks.map((song, idx) => (
-                    <motion.div
-                      key={`${song.spotifyId ?? song.title}-${song.artist}-${idx}`}
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.94 }}
-                      transition={{ duration: 0.22, delay: idx * 0.025, ease: [0.22, 1, 0.36, 1] }}
-                      layout
-                    >
-                      <SongCard
-                        song={song} C={C}
-                        onHeard={() => markHeard(song)}
-                        onAdd={() => addToPlaylist(song)}
-                      />
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              )
-            }
-          </div>
+          {loading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
+              {Array.from({ length: PAGE_SIZE }).map((_, i) => <SkeletonCard key={i} C={C} />)}
+            </div>
+          ) : gridStatus !== null ? (
+            /* ── Empty states ────────────────────────────────────────────── */
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="flex flex-col items-center justify-center text-center py-24 px-8 rounded-2xl"
+              style={{ border: `1.5px dashed ${C.border}`, background: C.bgCard, minHeight: 320 }}
+            >
+              {gridStatus === "not-connected" && (
+                <>
+                  <p style={{ fontSize: "2.5rem", marginBottom: 12 }}>♪</p>
+                  <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.35rem", fontWeight: 700, fontStyle: "italic", color: C.text, marginBottom: 8 }}>
+                    Connect Spotify to start listening
+                  </p>
+                  <p style={{ color: C.textMuted, fontSize: "0.875rem", lineHeight: 1.6, maxWidth: 320, marginBottom: 24 }}>
+                    Sign in with your Spotify account to fetch real tracks, hear previews, and export playlists.
+                  </p>
+                  <button
+                    onClick={handleConnect}
+                    className="flex items-center gap-2.5 px-6 py-3 rounded-full font-semibold text-sm transition-all hover:brightness-110 active:scale-[0.97]"
+                    style={{ background: "#1DB954", color: "white", boxShadow: "0 2px 16px rgba(29,185,84,0.32)" }}
+                  >
+                    <SiSpotify size={18} /> Connect Spotify
+                  </button>
+                </>
+              )}
+              {gridStatus === "empty" && (
+                <>
+                  <p style={{ fontSize: "2rem", marginBottom: 12 }}>🔍</p>
+                  <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.2rem", fontWeight: 700, color: C.text, marginBottom: 8 }}>
+                    No previewable tracks found
+                  </p>
+                  <p style={{ color: C.textMuted, fontSize: "0.875rem", lineHeight: 1.6, maxWidth: 300, marginBottom: 20 }}>
+                    Try a different genre, language, or click Get Fresh Set to search a different offset.
+                  </p>
+                  <button
+                    onClick={getFreshSet}
+                    className="px-6 py-2.5 rounded-full text-sm font-semibold transition-all hover:brightness-[0.96] active:scale-[0.97]"
+                    style={{ background: C.bgButton, border: `1.5px solid ${C.border}`, color: C.text }}
+                  >
+                    Get Fresh Set
+                  </button>
+                </>
+              )}
+              {gridStatus === "error" && (
+                <>
+                  <p style={{ fontSize: "2rem", marginBottom: 12 }}>⚠️</p>
+                  <p style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.2rem", fontWeight: 700, color: C.text, marginBottom: 8 }}>
+                    Spotify returned an error
+                  </p>
+                  <p style={{ color: C.textMuted, fontSize: "0.8rem", lineHeight: 1.6, maxWidth: 340, marginBottom: 20, wordBreak: "break-word" }}>
+                    {apiError}
+                  </p>
+                  <button
+                    onClick={getFreshSet}
+                    className="px-6 py-2.5 rounded-full text-sm font-semibold transition-all hover:brightness-[0.96] active:scale-[0.97]"
+                    style={{ background: C.bgButton, border: `1.5px solid ${C.border}`, color: C.text }}
+                  >
+                    Try Again
+                  </button>
+                </>
+              )}
+            </motion.div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
+              <AnimatePresence mode="popLayout">
+                {tracks.map((song, idx) => (
+                  <motion.div
+                    key={`${song.spotifyId ?? song.title}-${song.artist}-${idx}`}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.94 }}
+                    transition={{ duration: 0.22, delay: idx * 0.025, ease: [0.22, 1, 0.36, 1] }}
+                    layout
+                  >
+                    <SongCard
+                      song={song} C={C}
+                      onHeard={() => markHeard(song)}
+                      onAdd={() => addToPlaylist(song)}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
         </main>
       </div>
     </div>
