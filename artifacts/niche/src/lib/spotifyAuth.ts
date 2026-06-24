@@ -56,7 +56,8 @@ export async function initiateSpotifyAuth(): Promise<void> {
     code_challenge: challenge,
   });
 
-  window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`;
+  // ✅ FIXED: Added the missing '$' before the template brackets
+  window.location.href = `https://accounts.spotify.com/authorize?$${params.toString()}`;
 }
 
 interface TokenResponse {
