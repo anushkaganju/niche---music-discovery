@@ -649,32 +649,43 @@ export default function Home() {
 
   const C: Theme = darkMode ? DARK : LIGHT;
 
-  // ── fetchTracks ────────────────────────────────────────────────────────────
-  // ✅ FIX: useCallback deps are now [] (stable forever).
-  // Token is resolved INSIDE the function via getValidToken() at call-time,
-  // never closed over from stale state. This breaks the race condition where
-  // oauthToken/oauthAuthed hadn't updated yet when the effect fired.
+  // ── Fetch from Spotify with optional random offset ────────────────────────
   const fetchTracks = useCallback(
     async (genre: string, level: number, lang: string, offset = 0) => {
+      // Clear grid immediately so stale tracks never show under new filters
       setTracks([]);
       setApiError(null);
       setGridStatus(null);
 
-      // Always resolve the freshest possible token right now, not from closure
-      const token = await getValidToken();
+      // Resolve OAuth token (attempt refresh if stored but near-expiry)
+      let token: string | null = null;
+      if (oauthAuthed || oauthToken) {
+        const refreshed = await getValidToken();
+        if (refreshed) {
+          token = refreshed;
+          setOauthToken(refreshed);
+        }
+      }
 
+      // No valid token → prompt the user to connect, leave grid empty
       if (!token) {
+        console.log(
+          "[niche] No active Spotify token — awaiting OAuth connection.",
+        );
         setUsingLiveApi(false);
         setGridStatus("not-connected");
         return;
       }
 
-      // Keep UI state in sync with whatever token we actually resolved
-      setOauthToken(token);
-
       setLoading(true);
       try {
         const langParam = lang === "All" ? "" : lang;
+        console.log(
+          `[niche] Fetching → genre=${genre} level=${level} lang=${langParam || "any"} offset=${offset}`,
+        );
+        // fetchSpotifyPool internally checks for a curated playlist first
+        // (see CURATED_PLAYLISTS in spotify.ts) and falls back to live
+        // search for any genre/obscurity/language combo not yet curated.
         const pool = await fetchSpotifyPool(
           genre,
           level,
@@ -684,6 +695,7 @@ export default function Home() {
         );
 
         if (pool.length === 0) {
+          console.log("[niche] No tracks found for this query.");
           setGridStatus("empty");
           setUsingLiveApi(false);
         } else {
@@ -693,10 +705,8 @@ export default function Home() {
         }
       } catch (err) {
         if (err instanceof SpotifyAuthError) {
-          // ✅ FIX: Only clear auth on a hard Spotify rejection of a real API
-          // call, never during the OAuth handshake (which happens before this
-          // code path is ever reached).
-          console.warn(
+          // Token rejected by Spotify — clear session, prompt reconnect
+          console.log(
             "[niche] Spotify rejected token (401/403) — clearing auth.",
           );
           clearAuth();
@@ -705,6 +715,7 @@ export default function Home() {
           setUsingLiveApi(false);
           setGridStatus("not-connected");
         } else {
+          // Unexpected API error (5xx, rate limit, network)
           const msg = err instanceof Error ? err.message : String(err);
           console.error("[niche] Spotify API error:", msg);
           setApiError(msg);
@@ -715,8 +726,7 @@ export default function Home() {
         setLoading(false);
       }
     },
-    // ✅ Stable — no token/auth deps. getValidToken() reads localStorage fresh each call.
-    [],
+    [oauthToken, oauthAuthed],
   );
 
   // ── OAuth callback handler ─────────────────────────────────────────────────

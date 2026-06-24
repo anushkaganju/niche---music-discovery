@@ -13,12 +13,8 @@ const REFRESH_KEY = "niche_refresh_token";
 const EXPIRY_KEY = "niche_token_expiry";
 const VERIFIER_KEY = "niche_pkce_verifier";
 
-// ✅ FIX #1: Redirect back to the ROOT, not /callback.
-// A Vite SPA on Replit has no server-side routing, so /callback 404s before
-// React ever loads. The root path always loads the app, where the callback
-// useEffect can safely read ?code= from the URL.
 function getRedirectUri(): string {
-  return window.location.origin;
+  return `${window.location.origin}/callback`;
 }
 
 function generateCodeVerifier(): string {
@@ -49,13 +45,7 @@ export async function initiateSpotifyAuth(): Promise<void> {
   }
   const verifier = generateCodeVerifier();
   const challenge = await generateCodeChallenge(verifier);
-
-  // ✅ FIX #2: Use localStorage instead of sessionStorage for the PKCE verifier.
-  // Spotify's redirect causes a full page navigation. On some browsers/Replit
-  // preview frames, sessionStorage is wiped between the redirect origin and
-  // destination, so the verifier is gone by the time handleOAuthCallback runs.
-  // localStorage survives cross-origin navigations reliably.
-  localStorage.setItem(VERIFIER_KEY, verifier);
+  sessionStorage.setItem(VERIFIER_KEY, verifier);
 
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
@@ -87,8 +77,7 @@ function saveTokens(data: TokenResponse): void {
 export async function handleOAuthCallback(
   code: string,
 ): Promise<string | null> {
-  // ✅ FIX #2 (continued): Read verifier from localStorage, not sessionStorage.
-  const verifier = localStorage.getItem(VERIFIER_KEY);
+  const verifier = sessionStorage.getItem(VERIFIER_KEY);
   if (!verifier || !CLIENT_ID) return null;
 
   const body = new URLSearchParams({
@@ -109,8 +98,7 @@ export async function handleOAuthCallback(
 
   const data = (await res.json()) as TokenResponse;
   saveTokens(data);
-  // ✅ Clean up verifier from localStorage after successful exchange
-  localStorage.removeItem(VERIFIER_KEY);
+  sessionStorage.removeItem(VERIFIER_KEY);
   return data.access_token;
 }
 
@@ -159,8 +147,6 @@ export function clearAuth(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(REFRESH_KEY);
   localStorage.removeItem(EXPIRY_KEY);
-  // ✅ Also clear verifier on full logout, in case a login was interrupted
-  localStorage.removeItem(VERIFIER_KEY);
 }
 
 export function isAuthenticated(): boolean {
