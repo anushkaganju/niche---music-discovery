@@ -3,6 +3,8 @@ export interface SpotifyTrack {
   artist: string;
   albumArt?: string;
   spotifyId?: string;
+  spotifyUri?: string;
+  spotifyUrl?: string;
   previewUrl?: string;
   gradient: string;
 }
@@ -14,6 +16,13 @@ const GENRE_SEARCH_MAP: Record<string, string> = {
   "Indie": "indie",
   "R&B": "r-n-b",
   "Jazz": "jazz",
+};
+
+const LANGUAGE_SEEDS: Record<string, string[]> = {
+  "English": [],
+  "Hindi": ["bollywood", "hindi pop", "desi pop"],
+  "Spanish": ["latin pop", "reggaeton", "latin"],
+  "Japanese": ["j-pop", "city pop"],
 };
 
 const GENRE_GRADIENT_POOL: Record<string, string[]> = {
@@ -50,31 +59,40 @@ interface SpotifySearchTrack {
   name: string;
   popularity: number;
   preview_url: string | null;
+  external_urls: { spotify: string };
   album: { images: Array<{ url: string }> };
   artists: Array<{ name: string }>;
+  uri: string;
 }
 
 interface SpotifySearchResponse {
-  tracks: { items: SpotifySearchTrack[] };
+  tracks: { items: SpotifySearchTrack[]; total: number };
+}
+
+function buildQuery(genre: string, language: string): string {
+  const seed = GENRE_SEARCH_MAP[genre] ?? genre.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "n");
+  const langSeeds = LANGUAGE_SEEDS[language] ?? [];
+
+  if (langSeeds.length === 0) {
+    return `genre:"${seed}"`;
+  }
+
+  const langPart = langSeeds.map(s => `genre:"${s}"`).join(" OR ");
+  return `genre:"${seed}" (${langPart})`;
 }
 
 export async function fetchSpotifyPool(
   genre: string,
   obscurity: number,
   accessToken: string,
-  market = "",
-  poolSize = 50,
+  language = "",
+  offset = 0,
 ): Promise<SpotifyTrack[]> {
   const seed = GENRE_SEARCH_MAP[genre] ?? genre.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "n");
   const { min, max } = OBSCURITY_RANGES[obscurity] ?? OBSCURITY_RANGES[0];
+  const q = buildQuery(genre, language);
 
-  const params = new URLSearchParams({
-    q: `genre:"${seed}"`,
-    type: "track",
-    limit: "50",
-  });
-
-  if (market) params.set("market", market);
+  const params = new URLSearchParams({ q, type: "track", limit: "50", offset: String(offset) });
 
   const res = await fetch(`https://api.spotify.com/v1/search?${params.toString()}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -82,22 +100,29 @@ export async function fetchSpotifyPool(
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Spotify Search API ${res.status}: ${body}`);
+    throw new Error(`Spotify Search ${res.status}: ${body}`);
   }
 
   const data = await res.json() as SpotifySearchResponse;
-  const allTracks = data.tracks?.items ?? [];
+  const all = data.tracks?.items ?? [];
 
-  const filtered = allTracks.filter(t => t.popularity >= min && t.popularity <= max);
-  const source = filtered.length >= 6 ? filtered : allTracks;
+  const withPreview = all.filter(t => t.preview_url);
+  const withObscurity = withPreview.filter(t => t.popularity >= min && t.popularity <= max);
 
-  const shuffled = source.slice().sort(() => Math.random() - 0.5).slice(0, poolSize);
+  const source = withObscurity.length >= 4 ? withObscurity
+               : withPreview.length  >= 4 ? withPreview
+               : all.filter(t => t.preview_url).length > 0 ? all.filter(t => t.preview_url)
+               : all;
+
+  const shuffled = source.slice().sort(() => Math.random() - 0.5);
 
   return shuffled.map((track, i) => ({
     title: track.name,
     artist: track.artists.map(a => a.name).join(", "),
     albumArt: track.album.images[0]?.url,
     spotifyId: track.id,
+    spotifyUri: track.uri,
+    spotifyUrl: track.external_urls.spotify,
     previewUrl: track.preview_url ?? undefined,
     gradient: getGradient(seed, i),
   }));
@@ -105,4 +130,47 @@ export async function fetchSpotifyPool(
 
 export function obscurityLabel(level: number): string {
   return ["Familiar Territory", "Niche Territory", "Hidden Gems"][level] ?? "Familiar Territory";
+}
+
+// ── Spotify User & Playlist API ───────────────────────────────────────────────
+
+export async function getCurrentUserId(token: string): Promise<string> {
+  const res = await fetch("https://api.spotify.com/v1/me", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Could not fetch user profile: ${res.status}`);
+  const data = await res.json() as { id: string };
+  return data.id;
+}
+
+export async function createSpotifyPlaylist(
+  token: string,
+  userId: string,
+  name: string,
+): Promise<{ id: string; url: string }> {
+  const res = await fetch(`https://api.spotify.com/v1/users/${userId}/playlists`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ name, public: true, description: "Curated by Niche — music made for you, not the algorithm." }),
+  });
+  if (!res.ok) throw new Error(`Could not create playlist: ${res.status}`);
+  const data = await res.json() as { id: string; external_urls: { spotify: string } };
+  return { id: data.id, url: data.external_urls.spotify };
+}
+
+export async function addTracksToPlaylist(
+  token: string,
+  playlistId: string,
+  uris: string[],
+): Promise<void> {
+  const chunks = [];
+  for (let i = 0; i < uris.length; i += 100) chunks.push(uris.slice(i, i + 100));
+  for (const chunk of chunks) {
+    const res = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ uris: chunk }),
+    });
+    if (!res.ok) throw new Error(`Could not add tracks: ${res.status}`);
+  }
 }

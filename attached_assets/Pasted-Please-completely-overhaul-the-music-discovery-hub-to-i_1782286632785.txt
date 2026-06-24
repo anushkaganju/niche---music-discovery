@@ -1,0 +1,25 @@
+Please completely overhaul the music discovery hub to implement the final production features, fix the remaining backend bugs, and add a dark mode toggle while keeping the core UI layout exactly as it is:
+
+1. Clean Up Duplicate Buttons & UI Bug Fixes:
+- Remove any duplicate refresh/reload elements from the interface. Ensure there is only one clean, beautifully aligned "Get Fresh Set" button positioned at the top right of the music grid header.
+- Fix the "Get Fresh Set" functionality: Ensure clicking it triggers a brand-new API call to Spotify using a randomized 'offset' parameter to fetch completely fresh tracks, instead of just shuffling the existing array.
+- Fix disappearing album art: Implement an automatic token refresh check. If the Spotify token expires or fails, ensure the app cleanly handles the fallback gracefully without permanently breaking image URLs.
+
+2. Replace Region Dropdown with Multi-Select Language & Genre Chips:
+- Remove the "Select Region / Language" dropdown completely.
+- Replace it with a clickable grid layout of interactive tags/chips for Languages (English, Hindi, Spanish, Japanese) right under the genre selections.
+- Re-wire the Spotify query logic so that it explicitly appends query-level filters (e.g., matching text queries like 'q=genre:indie language:english' or similar localized query constraints) instead of raw market parameters, successfully bypassing regional location bias.
+
+3. Complete Audio Preview, Links, & Grid Constraints:
+- Render exactly 10 track cards at a time.
+- Implement strict validation on the Spotify data fetch: explicitly filter out any tracks where 'preview_url' is missing or null. Every single card displayed must play its 30-second audio snippet smoothly when the user hovers their cursor over it, fading out cleanly when they hover away.
+- Add an elegant, subtle Spotify link icon/button next to the track title on each card. Clicking it must open that exact track directly inside the Spotify web player or app in a new browser tab.
+
+4. Interactive Playlist Drawer & "Export to Spotify" Feature:
+- Add a floating or slide-out shelf panel titled "My Saved Discoveries" that slides out from the side when a dedicated playlist view button is toggled.
+- Wire the "+ Add to Playlist" buttons on each track card so that clicking them clones the track information dynamically into this saved panel list.
+- Add a prominent "Export to Spotify" button at the bottom of the playlist drawer. When clicked, it must use a Spotify POST API call to automatically create a brand-new, real public playlist directly inside the user's authentic Spotify account (e.g., named "Niche Finds") and populate it with all the saved tracks from their drawer.
+
+5. Add an Aesthetic Dark Mode Toggle:
+- Place a small, elegant Dark Mode toggle switch or icon button somewhere clean in the existing sidebar layout.
+- When toggled, use a smooth CSS transition to flip the app from the current warm cream/nostalgic palette to a beautiful dark mode ("Midnight Vinyl") using deep charcoal tones and vibrant green Spotify accents, without altering the physical layout or placement of the UI elements.
