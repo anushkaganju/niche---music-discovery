@@ -307,18 +307,14 @@ export async function fetchSpotifyPool(
   language = "",
   offset = 0,
 ): Promise<SpotifyTrack[]> {
-  const seed =
-    GENRE_SEARCH_MAP[genre] ??
-    genre.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "n");
+  console.log(
+    `[niche] Routing request directly to live search for genre: ${genre}`,
+  );
 
-  const curatedId = getCuratedPlaylistId(genre, obscurity, language);
-  if (curatedId) {
-    return fetchTracksFromPlaylist(curatedId, seed, accessToken);
-  }
-
+  // Bypassing restricted playlist maps due to Spotify's developer API endpoint limitations.
+  // This directs execution straight to your operational live search tool!
   return fetchTracksFromSearch(genre, obscurity, accessToken, language, offset);
 }
-
 export function obscurityLabel(level: number): string {
   return (
     ["Familiar Territory", "Niche Territory", "Hidden Gems"][level] ??
