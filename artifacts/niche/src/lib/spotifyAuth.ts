@@ -1,6 +1,4 @@
-const CLIENT_ID: string | undefined =
-  import.meta.env.VITE_SPOTIFY_CLIENT_ID || undefined;
-
+const CLIENT_ID: string | undefined = "77f5f74668bd46a285eb2051f1938855";
 const SCOPES = [
   "user-read-private",
   "user-read-email",
