@@ -133,10 +133,14 @@ function buildQuery(genre: string, language: string): string {
  * Fetch a randomised pool of Spotify tracks for the given params.
  *
  * NOTE: Spotify's /v1/search endpoint rejects limit=50 for this app/query
- * combination with a misleading "Invalid limit" 400, even though 50 is
- * within Spotify's documented max. Confirmed via direct curl testing that
- * limit=10 works reliably — keep this at 10 unless re-verified against
- * the live API.
+ * combination with a misleading "Invalid limit" 400. Confirmed via direct
+ * curl testing that limit=10 works reliably — keep this at 10 unless
+ * re-verified against the live API.
+ *
+ * NOTE: preview_url is no longer required/guaranteed by Spotify for most
+ * third-party apps, so tracks are no longer filtered on its presence.
+ * Cards without a preview simply skip the hover-to-play UI and rely on
+ * the "Open in Spotify" link instead.
  *
  * Throws SpotifyAuthError on 401/403 so callers can handle auth state.
  * Throws Error on other non-ok responses.
@@ -174,8 +178,8 @@ export async function fetchSpotifyPool(
   const data = (await res.json()) as SpotifySearchResponse;
   const all = data.tracks?.items ?? [];
 
-  // Strict validation: require both preview_url AND at least one album image
-  const valid = all.filter((t) => t.preview_url && t.album.images.length > 0);
+  // Only require album art now — preview_url is no longer guaranteed by Spotify
+  const valid = all.filter((t) => t.album.images.length > 0);
 
   // Apply obscurity filter on valid tracks; fall back to all valid if too few
   const withObscurity = valid.filter(
@@ -193,7 +197,7 @@ export async function fetchSpotifyPool(
     spotifyId: track.id,
     spotifyUri: track.uri,
     spotifyUrl: track.external_urls.spotify,
-    previewUrl: track.preview_url!, // guaranteed non-null after filter
+    previewUrl: track.preview_url ?? undefined, // optional — may be absent
     gradient: getGradient(seed, i),
   }));
 }
