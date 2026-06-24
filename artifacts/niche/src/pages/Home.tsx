@@ -339,8 +339,6 @@ function PlaylistDrawer({
   const [exportErr, setExportErr] = useState<string | null>(null);
 
   const handleExport = async () => {
-    // ✅ FIX: Always resolve a fresh token at export time via getValidToken(),
-    // never rely on the oauthToken prop which may be a stale snapshot.
     const token = await getValidToken();
     if (!token) {
       setExportErr("Connect Spotify to export your playlist.");
@@ -639,12 +637,7 @@ export default function Home() {
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // ✅ FIX: Track whether the OAuth callback has been handled in this session.
-  // Using a ref (not state) so it never triggers a re-render.
   const callbackHandled = useRef(false);
-
-  // ✅ FIX: Track whether oauthAuthed just flipped true so we can trigger
-  // one immediate fetch without adding oauthAuthed to the filter useEffect deps.
   const prevAuthed = useRef(false);
 
   const C: Theme = darkMode ? DARK : LIGHT;
@@ -652,12 +645,10 @@ export default function Home() {
   // ── Fetch from Spotify with optional random offset ────────────────────────
   const fetchTracks = useCallback(
     async (genre: string, level: number, lang: string, offset = 0) => {
-      // Clear grid immediately so stale tracks never show under new filters
       setTracks([]);
       setApiError(null);
       setGridStatus(null);
 
-      // Resolve OAuth token (attempt refresh if stored but near-expiry)
       let token: string | null = null;
       if (oauthAuthed || oauthToken) {
         const refreshed = await getValidToken();
@@ -667,7 +658,6 @@ export default function Home() {
         }
       }
 
-      // No valid token → prompt the user to connect, leave grid empty
       if (!token) {
         console.log(
           "[niche] No active Spotify token — awaiting OAuth connection.",
@@ -683,9 +673,6 @@ export default function Home() {
         console.log(
           `[niche] Fetching → genre=${genre} level=${level} lang=${langParam || "any"} offset=${offset}`,
         );
-        // fetchSpotifyPool internally checks for a curated playlist first
-        // (see CURATED_PLAYLISTS in spotify.ts) and falls back to live
-        // search for any genre/obscurity/language combo not yet curated.
         const pool = await fetchSpotifyPool(
           genre,
           level,
@@ -705,7 +692,6 @@ export default function Home() {
         }
       } catch (err) {
         if (err instanceof SpotifyAuthError) {
-          // Token rejected by Spotify — clear session, prompt reconnect
           console.log(
             "[niche] Spotify rejected token (401/403) — clearing auth.",
           );
@@ -715,7 +701,6 @@ export default function Home() {
           setUsingLiveApi(false);
           setGridStatus("not-connected");
         } else {
-          // Unexpected API error (5xx, rate limit, network)
           const msg = err instanceof Error ? err.message : String(err);
           console.error("[niche] Spotify API error:", msg);
           setApiError(msg);
@@ -730,10 +715,6 @@ export default function Home() {
   );
 
   // ── OAuth callback handler ─────────────────────────────────────────────────
-  // ✅ FIX: We no longer clean the URL *before* the async exchange completes.
-  // The old code did replaceState inside the .then() which raced with React's
-  // re-render. Now we clean the URL only after tokens are saved, and we update
-  // auth state *before* triggering any fetch.
   useEffect(() => {
     if (callbackHandled.current) return;
     const params = new URLSearchParams(window.location.search);
@@ -743,12 +724,8 @@ export default function Home() {
     callbackHandled.current = true;
 
     handleOAuthCallback(code).then((token) => {
-      // Clean up the URL first so a page refresh doesn't re-attempt the exchange
       window.history.replaceState({}, "", window.location.pathname);
-
       if (token) {
-        // Set both pieces of auth state together. The prevAuthed effect below
-        // will see oauthAuthed flip from false→true and trigger the first fetch.
         setOauthToken(token);
         setOauthAuthed(true);
       }
@@ -756,9 +733,6 @@ export default function Home() {
   }, []);
 
   // ── Trigger first fetch after OAuth login ──────────────────────────────────
-  // ✅ FIX: A dedicated effect watches for oauthAuthed flipping true and fires
-  // exactly one fetch. This decouples "just logged in" from the filter-change
-  // effect below, preventing the double-fetch race.
   useEffect(() => {
     if (oauthAuthed && !prevAuthed.current) {
       prevAuthed.current = true;
@@ -768,18 +742,13 @@ export default function Home() {
     if (!oauthAuthed) {
       prevAuthed.current = false;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [oauthAuthed]);
+  }, [oauthAuthed, activeGenre, customGenre, language, fetchTracks]);
 
   // ── Re-fetch on filter changes ─────────────────────────────────────────────
-  // ✅ FIX: fetchTracks is now stable ([] deps) so it's safe to omit from this
-  // array. We also no longer include oauthToken/oauthAuthed here — token
-  // resolution is handled inside fetchTracks itself.
   useEffect(() => {
     const genreKey = customGenre.trim() || activeGenre;
     fetchTracks(genreKey, obscurity, language, 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeGenre, obscurity, customGenre, language]);
+  }, [activeGenre, obscurity, customGenre, language, fetchTracks]);
 
   // ── "Get Fresh Set" ────────────────────────────────────────────────────────
   const getFreshSet = () => {
@@ -792,15 +761,20 @@ export default function Home() {
     setTracks((prev) => prev.filter((t) => t !== heardTrack));
   };
 
+  // ✅ FIXED: Reinforced with explicit error logging and an alert trigger
   const handleConnect = async () => {
+    console.log("[Home] Connect Spotify clicked");
     if (!hasClientId()) {
-      alert("VITE_SPOTIFY_CLIENT_ID is not configured.");
+      alert("VITE_SPOTIFY_CLIENT_ID is not configured or compiled.");
       return;
     }
     try {
       await initiateSpotifyAuth();
     } catch (e) {
-      console.error(e);
+      console.error("[Home] Spotify login initialization crashed:", e);
+      alert(
+        `Connection failed:\n\n${e instanceof Error ? e.message : String(e)}`,
+      );
     }
   };
 
@@ -808,7 +782,6 @@ export default function Home() {
     clearAuth();
     setOauthToken(null);
     setOauthAuthed(false);
-    // Show the not-connected empty state immediately on disconnect
     setTracks([]);
     setGridStatus("not-connected");
   };
@@ -935,6 +908,7 @@ export default function Home() {
             </div>
           ) : (
             <button
+              type="button"
               onClick={handleConnect}
               className="flex items-center justify-center gap-2.5 w-full py-3 rounded-full font-semibold transition-all duration-200 hover:brightness-110 active:scale-[0.98]"
               style={{
@@ -1342,6 +1316,7 @@ export default function Home() {
                     previews, and export playlists.
                   </p>
                   <button
+                    type="button"
                     onClick={handleConnect}
                     className="flex items-center gap-2.5 px-6 py-3 rounded-full font-semibold text-sm transition-all hover:brightness-110 active:scale-[0.97]"
                     style={{
