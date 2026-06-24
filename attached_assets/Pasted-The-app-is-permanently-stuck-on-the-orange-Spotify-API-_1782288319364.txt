@@ -1,0 +1,19 @@
+The app is permanently stuck on the orange "Spotify API error — showing curated picks" banner and loading the hardcoded fallback tracks, even when authenticated. The background code logic is broken. Let's fix this completely right now:
+
+1. Repair the Access Token & Authorization Header:
+- Ensure that the fetch requests to 'https://api.spotify.com/v1/search' explicitly check for a valid, non-expired accessToken in localStorage. 
+- If the token is missing or if the API returns a 401 or 403 error, explicitly clear the session, hide the music cards, and force the app to gracefully show the "Connect Spotify" button instead of freezing or crashing into the fallback state.
+
+2. Re-write the Search Query Constraints (Genre + Language):
+- Fix the search query formatting. Instead of breaking parameters, rewrite the Spotify search URL query logic to cleanly use advanced query filters like this: `https://api.spotify.com/v1/search?q=genre:"${selectedGenre}"%20"${selectedLanguage}"&type=track&limit=50`
+- Ensure that when a user changes a Language or Genre chip, it immediately triggers this new dynamic live search call.
+
+3. Fix the "Get Fresh Set" Logic:
+- Make sure clicking "Get Fresh Set" fetches completely fresh data by adding a randomized 'offset' parameter (between 0 and 40) to the live fetch request URL. 
+
+4. Strict Track Rendering & Image Verification:
+- Loop through the live results and filter out any tracks where 'preview_url' is missing or null, and where the album image array is empty. 
+- Take the top 10 valid tracks from that filtered list and dynamically insert their actual album cover image URLs (`track.album.images[0].url`) directly into the card structure. Remove the CSS placeholder background gradients permanently when live data is successfully fetched.
+
+5. Remove the Orange Error Banner on Success:
+- Ensure that if the server responds with a 200 OK and valid track data, the code explicitly removes the 'hidden' class from the music grid and completely hides the orange API error banner.

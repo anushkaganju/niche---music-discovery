@@ -7,6 +7,7 @@ import {
   getCurrentUserId,
   createSpotifyPlaylist,
   addTracksToPlaylist,
+  SpotifyAuthError,
 } from "@/lib/spotify";
 import type { SpotifyTrack } from "@/lib/spotify";
 import {
@@ -75,8 +76,10 @@ const DARK = {
 
 type Theme = typeof LIGHT;
 
-const SPOTIFY_TOKEN: string | undefined =
-  import.meta.env.VITE_SPOTIFY_ACCESS_TOKEN || undefined;
+// Note: Static VITE_SPOTIFY_ACCESS_TOKEN is intentionally NOT used as a
+// fallback — those tokens expire in 1 hour and would cause perpetual 401 errors.
+// Live data requires OAuth ("Connect Spotify"). Without a token, the app
+// silently shows curated picks with no error banner.
 
 const GENRES  = ["Pop", "Rock", "Hip-Hop", "Indie", "R&B", "Jazz"];
 const LANGUAGES = ["All", "English", "Hindi", "Spanish", "Japanese"];
@@ -611,7 +614,6 @@ export default function Home() {
   const callbackHandled = useRef(false);
 
   const C: Theme = darkMode ? DARK : LIGHT;
-  const activeToken = oauthToken ?? SPOTIFY_TOKEN;
 
   // ── OAuth callback ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -631,36 +633,59 @@ export default function Home() {
     const mockKey = `${genre}-${level}`;
     const mockFallback = (MOCK_DATA[mockKey] ?? MOCK_DATA["Pop-0"]).slice(0, PAGE_SIZE);
 
-    let token = activeToken;
-    if (oauthAuthed) {
+    // Resolve the best available token (refresh if near-expiry)
+    let token: string | null = null;
+    if (oauthAuthed || oauthToken) {
       const refreshed = await getValidToken();
-      if (refreshed) { token = refreshed; setOauthToken(refreshed); }
-    }
-
-    if (!token) {
-      setTracks(mockFallback); setUsingLiveApi(false); setApiError(null); return;
-    }
-
-    setLoading(true); setApiError(null);
-    try {
-      const langParam = lang === "All" ? "" : lang;
-      const pool = await fetchSpotifyPool(genre, level, token, langParam, offset);
-      setTracks(pool.slice(0, PAGE_SIZE));
-      setUsingLiveApi(true);
-    } catch {
-      // Try static token fallback
-      if (token !== SPOTIFY_TOKEN && SPOTIFY_TOKEN) {
-        try {
-          const langParam = lang === "All" ? "" : lang;
-          const pool = await fetchSpotifyPool(genre, level, SPOTIFY_TOKEN, langParam, offset);
-          setTracks(pool.slice(0, PAGE_SIZE)); setUsingLiveApi(true); return;
-        } catch { /* fall through */ }
+      if (refreshed) {
+        token = refreshed;
+        setOauthToken(refreshed);
       }
-      setApiError("Spotify API error"); setTracks(mockFallback); setUsingLiveApi(false);
+    }
+
+    // No valid OAuth token → show curated picks silently, no error banner
+    if (!token) {
+      setTracks(mockFallback);
+      setUsingLiveApi(false);
+      setApiError(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setApiError(null);
+    try {
+      const langParam = lang === "All" || lang === "English" ? "" : lang;
+      const pool = await fetchSpotifyPool(genre, level, token, langParam, offset);
+
+      if (pool.length === 0) {
+        // Valid response but no previewable tracks — fall back silently
+        setTracks(mockFallback);
+        setUsingLiveApi(false);
+      } else {
+        setTracks(pool.slice(0, PAGE_SIZE));
+        setUsingLiveApi(true);
+        setApiError(null);
+      }
+    } catch (err) {
+      if (err instanceof SpotifyAuthError) {
+        // Token rejected — clear auth state, show curated picks, NO error banner
+        clearAuth();
+        setOauthToken(null);
+        setOauthAuthed(false);
+        setTracks(mockFallback);
+        setUsingLiveApi(false);
+        setApiError(null);
+      } else {
+        // Genuine unexpected API error (5xx, rate limit, network, etc.)
+        setApiError("Spotify API error — showing curated picks");
+        setTracks(mockFallback);
+        setUsingLiveApi(false);
+      }
     } finally {
       setLoading(false);
     }
-  }, [activeToken, oauthAuthed]);
+  }, [oauthToken, oauthAuthed]);
 
   // Re-fetch whenever filters change (offset=0 for new filter)
   useEffect(() => {
