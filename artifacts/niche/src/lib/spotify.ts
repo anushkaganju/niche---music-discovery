@@ -117,6 +117,10 @@ interface SpotifySearchResponse {
  * Build a Spotify search query string combining genre seed and an optional
  * language hint. Format follows the user-visible q= convention:
  *   genre:"pop" "Hindi"
+ *
+ * NOTE: "English" used to be treated the same as "All" (i.e. no filter at
+ * all), which is why English-only searches were returning non-English
+ * tracks. Only "All" should skip the language hint now.
  */
 function buildQuery(genre: string, language: string): string {
   const seed =
@@ -131,8 +135,10 @@ function buildQuery(genre: string, language: string): string {
  *
  * NOTE: Spotify's /v1/search endpoint rejects limit=50 for this app/query
  * combination with a misleading "Invalid limit" 400. Confirmed via direct
- * curl testing that limit=10 works reliably — keep this at 10 unless
- * re-verified against the live API.
+ * curl testing that limit=10 works reliably. To still get a decent-sized
+ * pool for the obscurity filter to work with, we page through several
+ * limit=10 requests and merge the results instead of requesting a bigger
+ * limit in one call.
  *
  * NOTE: preview_url is no longer required/guaranteed by Spotify for most
  * third-party apps, so tracks are no longer filtered on its presence.
@@ -140,7 +146,8 @@ function buildQuery(genre: string, language: string): string {
  * the "Open in Spotify" link instead.
  *
  * Throws SpotifyAuthError on 401/403 so callers can handle auth state.
- * Throws Error on other non-ok responses.
+ * Throws Error on other non-ok responses (unless it's a later page running
+ * out of results, in which case we just stop paging).
  */
 export async function fetchSpotifyPool(
   genre: string,
@@ -156,24 +163,40 @@ export async function fetchSpotifyPool(
   const q = buildQuery(genre, language);
 
   const SEARCH_LIMIT = 10;
-  const safeOffset = Math.floor(offset || 0);
-  const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=${SEARCH_LIMIT}&offset=${safeOffset}`;
+  const PAGES = 4; // up to 4 * 10 = 40 tracks pooled per search
+  const baseOffset = Math.floor(offset || 0);
 
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  let all: SpotifySearchTrack[] = [];
 
-  if (res.status === 401 || res.status === 403) {
-    throw new SpotifyAuthError(res.status);
+  for (let p = 0; p < PAGES; p++) {
+    const pageOffset = baseOffset + p * SEARCH_LIMIT;
+    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=${SEARCH_LIMIT}&offset=${pageOffset}`;
+
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (res.status === 401 || res.status === 403) {
+      throw new SpotifyAuthError(res.status);
+    }
+
+    if (!res.ok) {
+      const body = await res.text();
+      // If the FIRST page fails, surface the error as before.
+      // If a LATER page fails (e.g. we paged past the end of results),
+      // just stop paging and use whatever we've already collected.
+      if (p === 0) {
+        throw new Error(`Spotify Search ${res.status}: ${body}`);
+      }
+      break;
+    }
+
+    const data = (await res.json()) as SpotifySearchResponse;
+    const items = data.tracks?.items ?? [];
+    all = all.concat(items);
+
+    if (items.length < SEARCH_LIMIT) break; // no more results to page through
   }
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Spotify Search ${res.status}: ${body}`);
-  }
-
-  const data = (await res.json()) as SpotifySearchResponse;
-  const all = data.tracks?.items ?? [];
 
   // Only require album art now — preview_url is no longer guaranteed by Spotify
   const valid = all.filter((t) => t.album.images.length > 0);
@@ -184,7 +207,7 @@ export async function fetchSpotifyPool(
   );
   const source = withObscurity.length >= 4 ? withObscurity : valid;
 
-  // Shuffle (caller can slice further if needed)
+  // Shuffle and let caller slice further
   const shuffled = source.slice().sort(() => Math.random() - 0.5);
 
   return shuffled.map((track, i) => ({

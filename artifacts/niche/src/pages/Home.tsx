@@ -1289,7 +1289,8 @@ function PlaylistDrawer({
   const [exportErr, setExportErr] = useState<string | null>(null);
 
   const handleExport = async () => {
-    if (!oauthToken) {
+    const token = await getValidToken();
+    if (!token) {
       setExportErr("Connect Spotify to export your playlist.");
       return;
     }
@@ -1301,18 +1302,18 @@ function PlaylistDrawer({
     setExportErr(null);
     setExportUrl(null);
     try {
-      const userId = await getCurrentUserId(oauthToken);
+      const userId = await getCurrentUserId(token);
       const date = new Date().toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
       });
       const { id, url } = await createSpotifyPlaylist(
-        oauthToken,
+        token,
         userId,
         `Niche Finds – ${date}`,
       );
       const uris = tracks.filter((t) => t.spotifyUri).map((t) => t.spotifyUri!);
-      if (uris.length > 0) await addTracksToPlaylist(oauthToken, id, uris);
+      if (uris.length > 0) await addTracksToPlaylist(token, id, uris);
       setExportUrl(url);
     } catch (e) {
       setExportErr(e instanceof Error ? e.message : "Export failed.");
