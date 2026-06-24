@@ -8,13 +8,13 @@ const SCOPES = [
   "playlist-modify-private",
 ].join(" ");
 
-const TOKEN_KEY    = "niche_access_token";
-const REFRESH_KEY  = "niche_refresh_token";
-const EXPIRY_KEY   = "niche_token_expiry";
+const TOKEN_KEY = "niche_access_token";
+const REFRESH_KEY = "niche_refresh_token";
+const EXPIRY_KEY = "niche_token_expiry";
 const VERIFIER_KEY = "niche_pkce_verifier";
 
 function getRedirectUri(): string {
-  return window.location.origin + window.location.pathname;
+  return `${window.location.origin}/callback`;
 }
 
 function generateCodeVerifier(): string {
@@ -74,7 +74,9 @@ function saveTokens(data: TokenResponse): void {
   localStorage.setItem(EXPIRY_KEY, String(expiry));
 }
 
-export async function handleOAuthCallback(code: string): Promise<string | null> {
+export async function handleOAuthCallback(
+  code: string,
+): Promise<string | null> {
   const verifier = sessionStorage.getItem(VERIFIER_KEY);
   if (!verifier || !CLIENT_ID) return null;
 
@@ -94,7 +96,7 @@ export async function handleOAuthCallback(code: string): Promise<string | null> 
 
   if (!res.ok) return null;
 
-  const data = await res.json() as TokenResponse;
+  const data = (await res.json()) as TokenResponse;
   saveTokens(data);
   sessionStorage.removeItem(VERIFIER_KEY);
   return data.access_token;
@@ -121,7 +123,7 @@ async function refreshAccessToken(): Promise<string | null> {
     return null;
   }
 
-  const data = await res.json() as TokenResponse;
+  const data = (await res.json()) as TokenResponse;
   saveTokens(data);
   return data.access_token;
 }
