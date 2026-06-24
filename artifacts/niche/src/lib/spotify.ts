@@ -9,7 +9,7 @@ export interface SpotifyTrack {
   gradient: string;
 }
 
-// Thrown when the API returns 401 or 403 — caller should clear auth state
+// Thrown when the API returns 401 — caller should clear auth state
 export class SpotifyAuthError extends Error {
   constructor(status: number) {
     super(`Spotify auth error: ${status}`);
@@ -118,13 +118,6 @@ interface SpotifyPlaylistResponse {
 }
 
 // ── Curated playlists ──────────────────────────────────────────────────────────
-// Maps "<Genre>-<obscurityLevel>" (and optionally "<Genre>-<obscurityLevel>-<Language>")
-// to a Spotify playlist ID. When a curated playlist exists for the requested
-// genre/obscurity/language combo, we pull tracks from it directly instead of
-// relying on Spotify's /v1/search popularity scoring (which doesn't reliably
-// distinguish "familiar" from "hidden gem").
-//
-// Lookup order: "<Genre>-<level>-<Language>" → "<Genre>-<level>" → live search fallback.
 const CURATED_PLAYLISTS: Record<string, string> = {
   // Indie — general
   "Indie-0": "3V5BrJv7p0rfkO1X7NzLOv", // Familiar
@@ -134,7 +127,7 @@ const CURATED_PLAYLISTS: Record<string, string> = {
   // Indie — Hindi-specific
   "Indie-0-Hindi": "7AexoOofx2Sx8YYTWfWdLj",
   "Indie-1-Hindi": "5xugE6eBfTfZ2irkcdY8Qw",
-  "Indie-2-Hindi": "4xAVUOlDPVReVZIjeOmO55", // same as Indie-2 general
+  "Indie-2-Hindi": "4xAVUOlDPVReVZIjeOmO55",
 
   // Pop — general
   "Pop-0": "5tqpfFWqH2fQHVcQacxSUM", // Familiar
@@ -156,13 +149,6 @@ function getCuratedPlaylistId(
   return CURATED_PLAYLISTS[generalKey] ?? null;
 }
 
-/**
- * Build a Spotify search query string combining genre seed and an optional
- * language hint. Format follows the user-visible q= convention:
- *   genre:"pop" "Hindi"
- *
- * Only used as a fallback for genre/obscurity combos with no curated playlist.
- */
 function buildQuery(genre: string, language: string): string {
   const seed =
     GENRE_SEARCH_MAP[genre] ??
@@ -189,23 +175,30 @@ function mapSearchTrack(
 }
 
 /**
- * Fetch tracks directly from a curated Spotify playlist. Used when a
- * playlist has been manually curated for a given genre/obscurity/language
- * combo, bypassing Spotify's search/popularity scoring entirely.
+ * Fetch tracks from a curated playlist. Returns null on 403 or 404 so that
+ * the pool manager can fall back to search instead of kicking the user out.
  */
 async function fetchTracksFromPlaylist(
   playlistId: string,
   seed: string,
   accessToken: string,
-): Promise<SpotifyTrack[]> {
+): Promise<SpotifyTrack[] | null> {
   const url = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
-  if (res.status === 401 || res.status === 403) {
-    throw new SpotifyAuthError(res.status);
+  if (res.status === 401) {
+    throw new SpotifyAuthError(res.status); // Session dead -> Re-authenticate
   }
+
+  if (res.status === 403 || res.status === 404) {
+    console.warn(
+      `[niche] Playlist ${playlistId} restricted or unavailable (${res.status}). Falling back to search.`,
+    );
+    return null; // Don't crash, signal fallback
+  }
+
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`Spotify Playlist ${res.status}: ${body}`);
@@ -222,17 +215,6 @@ async function fetchTracksFromPlaylist(
   return shuffled.map((track, i) => mapSearchTrack(track, seed, i));
 }
 
-/**
- * Fall back to live Spotify search for genre/obscurity combos without a
- * curated playlist yet.
- *
- * NOTE: Spotify's /v1/search endpoint rejects limit=50 for this app/query
- * combination with a misleading "Invalid limit" 400. Confirmed via direct
- * curl testing that limit=10 works reliably. To still get a decent-sized
- * pool for the obscurity filter to work with, we page through several
- * limit=10 requests and merge the results instead of requesting a bigger
- * limit in one call.
- */
 async function fetchTracksFromSearch(
   genre: string,
   obscurity: number,
@@ -247,7 +229,7 @@ async function fetchTracksFromSearch(
   const q = buildQuery(genre, language);
 
   const SEARCH_LIMIT = 10;
-  const PAGES = 4; // up to 4 * 10 = 40 tracks pooled per search
+  const PAGES = 4;
   const baseOffset = Math.floor(offset || 0);
 
   let all: SpotifySearchTrack[] = [];
@@ -290,15 +272,7 @@ async function fetchTracksFromSearch(
 }
 
 /**
- * Fetch a randomised pool of tracks for the given genre/obscurity/language.
- *
- * Tries a curated playlist first (see CURATED_PLAYLISTS) — this gives
- * reliable, hand-picked "Familiar" vs "Niche" vs "Hidden Gems" results
- * instead of trusting Spotify's popularity score. Falls back to live
- * search for any genre/obscurity combo without a curated playlist yet.
- *
- * Throws SpotifyAuthError on 401/403 so callers can handle auth state.
- * Throws Error on other non-ok responses.
+ * Curated playlist pool manager with immediate search fallback safety.
  */
 export async function fetchSpotifyPool(
   genre: string,
@@ -307,14 +281,26 @@ export async function fetchSpotifyPool(
   language = "",
   offset = 0,
 ): Promise<SpotifyTrack[]> {
-  console.log(
-    `[niche] Routing request directly to live search for genre: ${genre}`,
-  );
+  const seed =
+    GENRE_SEARCH_MAP[genre] ??
+    genre.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "n");
 
-  // Bypassing restricted playlist maps due to Spotify's developer API endpoint limitations.
-  // This directs execution straight to your operational live search tool!
+  const curatedId = getCuratedPlaylistId(genre, obscurity, language);
+  if (curatedId) {
+    const fromPlaylist = await fetchTracksFromPlaylist(
+      curatedId,
+      seed,
+      accessToken,
+    );
+    if (fromPlaylist && fromPlaylist.length > 0) {
+      return fromPlaylist; // Loaded your public tracks perfectly!
+    }
+  }
+
+  // Fallback seamlessly if the requested map is empty or hasn't been set up yet
   return fetchTracksFromSearch(genre, obscurity, accessToken, language, offset);
 }
+
 export function obscurityLabel(level: number): string {
   return (
     ["Familiar Territory", "Niche Territory", "Hidden Gems"][level] ??
