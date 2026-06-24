@@ -103,7 +103,10 @@ export async function fetchSpotifyPool(
   const { min, max } = OBSCURITY_RANGES[obscurity] ?? OBSCURITY_RANGES[0];
   const q = buildQuery(genre, language);
 
-  const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=50&offset=${offset}`;
+  // limit is hardcoded to 10 (Spotify's API rejects non-integer/oversized values);
+  // offset is floored and defaulted to guard against decimals or undefined input
+  const safeOffset = Math.floor(offset || 0);
+  const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=10&offset=${safeOffset}`;
 
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
