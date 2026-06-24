@@ -54,7 +54,7 @@ export async function initiateSpotifyAuth(): Promise<void> {
     code_challenge: challenge,
   });
 
-  // ✅ FIXED: Clean single '$' interpolation format string
+  // ✅ FIXED: Clean single '$' template injection format
   window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`;
 }
 
