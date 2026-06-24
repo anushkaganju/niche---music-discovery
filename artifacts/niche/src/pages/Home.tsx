@@ -76,956 +76,12 @@ const DARK = {
 
 type Theme = typeof LIGHT;
 
-// Note: Static VITE_SPOTIFY_ACCESS_TOKEN is intentionally NOT used as a
-// fallback — those tokens expire in 1 hour and would cause perpetual 401 errors.
-// Live data requires OAuth ("Connect Spotify"). Without a token, the app
-// silently shows curated picks with no error banner.
-
 const GENRES = ["Pop", "Rock", "Hip-Hop", "Indie", "R&B", "Jazz"];
 const LANGUAGES = ["All", "English", "Hindi", "Spanish", "Japanese"];
 const OBSCURITY_LABELS = ["Familiar", "A Bit Niche", "Hidden Gems"];
 const TRANSPARENT_PIXEL =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 const PAGE_SIZE = 10;
-
-const MOCK_DATA: Record<string, Track[]> = {
-  "Pop-0": [
-    {
-      title: "Levitating",
-      artist: "Dua Lipa",
-      gradient: "linear-gradient(135deg,#f8b4d9 0%,#fbc8a3 100%)",
-    },
-    {
-      title: "Blinding Lights",
-      artist: "The Weeknd",
-      gradient: "linear-gradient(135deg,#ffd6e7 0%,#ffb3c6 100%)",
-    },
-    {
-      title: "Shape of You",
-      artist: "Ed Sheeran",
-      gradient: "linear-gradient(135deg,#ffd6a5 0%,#fdffb6 100%)",
-    },
-    {
-      title: "As It Was",
-      artist: "Harry Styles",
-      gradient: "linear-gradient(135deg,#fce4ec 0%,#f8bbd0 100%)",
-    },
-    {
-      title: "Anti-Hero",
-      artist: "Taylor Swift",
-      gradient: "linear-gradient(135deg,#e8f5e9 0%,#c8e6c9 100%)",
-    },
-    {
-      title: "Stay",
-      artist: "The Kid LAROI",
-      gradient: "linear-gradient(135deg,#fff9c4 0%,#fff176 100%)",
-    },
-    {
-      title: "Bad Habits",
-      artist: "Ed Sheeran",
-      gradient: "linear-gradient(135deg,#fce4ec 0%,#f48fb1 100%)",
-    },
-    {
-      title: "Heat Waves",
-      artist: "Glass Animals",
-      gradient: "linear-gradient(135deg,#e3f2fd 0%,#90caf9 100%)",
-    },
-    {
-      title: "Watermelon Sugar",
-      artist: "Harry Styles",
-      gradient: "linear-gradient(135deg,#f9fbe7 0%,#f0f4c3 100%)",
-    },
-    {
-      title: "drivers license",
-      artist: "Olivia Rodrigo",
-      gradient: "linear-gradient(135deg,#ede7f6 0%,#b39ddb 100%)",
-    },
-  ],
-  "Pop-1": [
-    {
-      title: "Solar Power",
-      artist: "Lorde",
-      gradient: "linear-gradient(135deg,#caffbf 0%,#fdffb6 100%)",
-    },
-    {
-      title: "Easy On Me",
-      artist: "Adele",
-      gradient: "linear-gradient(135deg,#ffd6e7 0%,#ffecd2 100%)",
-    },
-    {
-      title: "Midnight Rain",
-      artist: "Taylor Swift",
-      gradient: "linear-gradient(135deg,#d1c4e9 0%,#b39ddb 100%)",
-    },
-    {
-      title: "Georgia",
-      artist: "Benson Boone",
-      gradient: "linear-gradient(135deg,#e2d9f3 0%,#b5a8d8 100%)",
-    },
-    {
-      title: "Ribs",
-      artist: "Lorde",
-      gradient: "linear-gradient(135deg,#e8eaf6 0%,#c5cae9 100%)",
-    },
-    {
-      title: "Heather",
-      artist: "Conan Gray",
-      gradient: "linear-gradient(135deg,#e8f5e9 0%,#c8e6c9 100%)",
-    },
-    {
-      title: "Superstar",
-      artist: "Carpenters",
-      gradient: "linear-gradient(135deg,#fff8e1 0%,#ffecb3 100%)",
-    },
-    {
-      title: "traitor",
-      artist: "Olivia Rodrigo",
-      gradient: "linear-gradient(135deg,#fce4ec 0%,#f8bbd0 100%)",
-    },
-    {
-      title: "2step",
-      artist: "Ed Sheeran",
-      gradient: "linear-gradient(135deg,#e3f2fd 0%,#bbdefb 100%)",
-    },
-    {
-      title: "In My Arms",
-      artist: "Maisie Peters",
-      gradient: "linear-gradient(135deg,#ffccd5 0%,#ff85a1 100%)",
-    },
-  ],
-  "Pop-2": [
-    {
-      title: "Ceilings",
-      artist: "Lizzy McAlpine",
-      gradient: "linear-gradient(135deg,#d8f3dc 0%,#b7e4c7 100%)",
-    },
-    {
-      title: "Stick Season",
-      artist: "Noah Kahan",
-      gradient: "linear-gradient(135deg,#ffe8a3 0%,#ffd166 100%)",
-    },
-    {
-      title: "Motion Sickness",
-      artist: "Phoebe Bridgers",
-      gradient: "linear-gradient(135deg,#cde2f9 0%,#a9d0f5 100%)",
-    },
-    {
-      title: "Funeral",
-      artist: "Phoebe Bridgers",
-      gradient: "linear-gradient(135deg,#e1bee7 0%,#ce93d8 100%)",
-    },
-    {
-      title: "Hex Head",
-      artist: "Arlo Parks",
-      gradient: "linear-gradient(135deg,#fce4ec 0%,#f48fb1 100%)",
-    },
-    {
-      title: "Stranger",
-      artist: "Jordana",
-      gradient: "linear-gradient(135deg,#f7cad0 0%,#ffe8d6 100%)",
-    },
-    {
-      title: "Savior Complex",
-      artist: "Phoebe Bridgers",
-      gradient: "linear-gradient(135deg,#c3b1e1 0%,#e8d5f5 100%)",
-    },
-    {
-      title: "Honey",
-      artist: "Hovvdy",
-      gradient: "linear-gradient(135deg,#fff9c4 0%,#fff59d 100%)",
-    },
-    {
-      title: "Clarity",
-      artist: "Raveena",
-      gradient: "linear-gradient(135deg,#fce4ec 0%,#f8bbd0 100%)",
-    },
-    {
-      title: "First Aid",
-      artist: "Waxahatchee",
-      gradient: "linear-gradient(135deg,#e8f5e9 0%,#a5d6a7 100%)",
-    },
-  ],
-  "Rock-0": [
-    {
-      title: "Mr. Brightside",
-      artist: "The Killers",
-      gradient: "linear-gradient(135deg,#ff9a3c 0%,#ff6b6b 100%)",
-    },
-    {
-      title: "Seven Nation Army",
-      artist: "The White Stripes",
-      gradient: "linear-gradient(135deg,#f72585 0%,#b5179e 100%)",
-    },
-    {
-      title: "Bohemian Rhapsody",
-      artist: "Queen",
-      gradient: "linear-gradient(135deg,#ffd6a5 0%,#ffb347 100%)",
-    },
-    {
-      title: "Smells Like Teen Spirit",
-      artist: "Nirvana",
-      gradient: "linear-gradient(135deg,#b0bec5 0%,#607d8b 100%)",
-    },
-    {
-      title: "Wonderwall",
-      artist: "Oasis",
-      gradient: "linear-gradient(135deg,#fff59d 0%,#f9a825 100%)",
-    },
-    {
-      title: "Come As You Are",
-      artist: "Nirvana",
-      gradient: "linear-gradient(135deg,#b2dfdb 0%,#80cbc4 100%)",
-    },
-    {
-      title: "Under the Bridge",
-      artist: "Red Hot Chili Peppers",
-      gradient: "linear-gradient(135deg,#ff8a80 0%,#ff5252 100%)",
-    },
-    {
-      title: "Creep",
-      artist: "Radiohead",
-      gradient: "linear-gradient(135deg,#cfd8dc 0%,#90a4ae 100%)",
-    },
-    {
-      title: "Black",
-      artist: "Pearl Jam",
-      gradient: "linear-gradient(135deg,#37474f 0%,#263238 100%)",
-    },
-    {
-      title: "Eye of the Tiger",
-      artist: "Survivor",
-      gradient: "linear-gradient(135deg,#ffc107 0%,#ff5722 100%)",
-    },
-  ],
-  "Rock-1": [
-    {
-      title: "Dark Side of the Gym",
-      artist: "The National",
-      gradient: "linear-gradient(135deg,#6a4c93 0%,#9b5de5 100%)",
-    },
-    {
-      title: "I Will Follow You into the Dark",
-      artist: "Death Cab for Cutie",
-      gradient: "linear-gradient(135deg,#a8dadc 0%,#457b9d 100%)",
-    },
-    {
-      title: "The Less I Know the Better",
-      artist: "Tame Impala",
-      gradient: "linear-gradient(135deg,#c77dff 0%,#7b2ff7 100%)",
-    },
-    {
-      title: "Pink Moon",
-      artist: "Nick Drake",
-      gradient: "linear-gradient(135deg,#ffe0b2 0%,#ffcc80 100%)",
-    },
-    {
-      title: "505",
-      artist: "Arctic Monkeys",
-      gradient: "linear-gradient(135deg,#546e7a 0%,#37474f 100%)",
-    },
-    {
-      title: "Mardy Bum",
-      artist: "Arctic Monkeys",
-      gradient: "linear-gradient(135deg,#f4a261 0%,#e76f51 100%)",
-    },
-    {
-      title: "Vapour Trail",
-      artist: "Ride",
-      gradient: "linear-gradient(135deg,#e1f5fe 0%,#b3e5fc 100%)",
-    },
-    {
-      title: "Fluorescent Adolescent",
-      artist: "Arctic Monkeys",
-      gradient: "linear-gradient(135deg,#f06292 0%,#e91e63 100%)",
-    },
-    {
-      title: "When The Sun Goes Down",
-      artist: "Arctic Monkeys",
-      gradient: "linear-gradient(135deg,#ff8f00 0%,#ff6f00 100%)",
-    },
-    {
-      title: "Knee Socks",
-      artist: "Arctic Monkeys",
-      gradient: "linear-gradient(135deg,#78909c 0%,#546e7a 100%)",
-    },
-  ],
-  "Rock-2": [
-    {
-      title: "This Is the Last Time",
-      artist: "The National",
-      gradient: "linear-gradient(135deg,#264653 0%,#2a9d8f 100%)",
-    },
-    {
-      title: "Lua",
-      artist: "Bright Eyes",
-      gradient: "linear-gradient(135deg,#ffecd2 0%,#fcb69f 100%)",
-    },
-    {
-      title: "Fourth of July",
-      artist: "Sufjan Stevens",
-      gradient: "linear-gradient(135deg,#e8eaf6 0%,#9fa8da 100%)",
-    },
-    {
-      title: "No Children",
-      artist: "The Mountain Goats",
-      gradient: "linear-gradient(135deg,#efebe9 0%,#d7ccc8 100%)",
-    },
-    {
-      title: "White Winter Hymnal",
-      artist: "Fleet Foxes",
-      gradient: "linear-gradient(135deg,#e8eaf6 0%,#c5cae9 100%)",
-    },
-    {
-      title: "Casimir Pulaski Day",
-      artist: "Sufjan Stevens",
-      gradient: "linear-gradient(135deg,#e3f2fd 0%,#90caf9 100%)",
-    },
-    {
-      title: "Have One on Me",
-      artist: "Joanna Newsom",
-      gradient: "linear-gradient(135deg,#fff8e1 0%,#ffe082 100%)",
-    },
-    {
-      title: "Obstacles",
-      artist: "Syd Matters",
-      gradient: "linear-gradient(135deg,#caf0f8 0%,#90e0ef 100%)",
-    },
-    {
-      title: "Tiger Mountain Peasant Song",
-      artist: "Fleet Foxes",
-      gradient: "linear-gradient(135deg,#f1f8e9 0%,#dcedc8 100%)",
-    },
-    {
-      title: "Heretic Pride",
-      artist: "The Mountain Goats",
-      gradient: "linear-gradient(135deg,#fff3e0 0%,#ffe0b2 100%)",
-    },
-  ],
-  "Hip-Hop-0": [
-    {
-      title: "God's Plan",
-      artist: "Drake",
-      gradient: "linear-gradient(135deg,#ffe57f 0%,#ffca28 100%)",
-    },
-    {
-      title: "HUMBLE.",
-      artist: "Kendrick Lamar",
-      gradient: "linear-gradient(135deg,#d62828 0%,#f77f00 100%)",
-    },
-    {
-      title: "Sicko Mode",
-      artist: "Travis Scott",
-      gradient: "linear-gradient(135deg,#1a1a2e 0%,#16213e 100%)",
-    },
-    {
-      title: "Not Like Us",
-      artist: "Kendrick Lamar",
-      gradient: "linear-gradient(135deg,#1b5e20 0%,#2e7d32 100%)",
-    },
-    {
-      title: "DNA.",
-      artist: "Kendrick Lamar",
-      gradient: "linear-gradient(135deg,#b71c1c 0%,#d32f2f 100%)",
-    },
-    {
-      title: "Rockstar",
-      artist: "Post Malone ft. 21 Savage",
-      gradient: "linear-gradient(135deg,#4a148c 0%,#6a1b9a 100%)",
-    },
-    {
-      title: "Industry Baby",
-      artist: "Lil Nas X",
-      gradient: "linear-gradient(135deg,#1565c0 0%,#1976d2 100%)",
-    },
-    {
-      title: "Rich Flex",
-      artist: "Drake & 21 Savage",
-      gradient: "linear-gradient(135deg,#212121 0%,#424242 100%)",
-    },
-    {
-      title: "Essence",
-      artist: "Wizkid ft. Tems",
-      gradient: "linear-gradient(135deg,#f57f17 0%,#ffa000 100%)",
-    },
-    {
-      title: "MONTERO",
-      artist: "Lil Nas X",
-      gradient: "linear-gradient(135deg,#880e4f 0%,#ad1457 100%)",
-    },
-  ],
-  "Hip-Hop-1": [
-    {
-      title: "Nikes",
-      artist: "Frank Ocean",
-      gradient: "linear-gradient(135deg,#48cae4 0%,#0077b6 100%)",
-    },
-    {
-      title: "PRIDE.",
-      artist: "Kendrick Lamar",
-      gradient: "linear-gradient(135deg,#f8b4d9 0%,#c77dff 100%)",
-    },
-    {
-      title: "Waves",
-      artist: "Mac Miller",
-      gradient: "linear-gradient(135deg,#74c69d 0%,#40916c 100%)",
-    },
-    {
-      title: "Self Control",
-      artist: "Frank Ocean",
-      gradient: "linear-gradient(135deg,#b2ebf2 0%,#80deea 100%)",
-    },
-    {
-      title: "2009",
-      artist: "Mac Miller",
-      gradient: "linear-gradient(135deg,#e8f5e9 0%,#81c784 100%)",
-    },
-    {
-      title: "Programs",
-      artist: "Saba",
-      gradient: "linear-gradient(135deg,#ede7f6 0%,#b39ddb 100%)",
-    },
-    {
-      title: "Shadow of a Doubt",
-      artist: "Noname",
-      gradient: "linear-gradient(135deg,#f3e5f5 0%,#e1bee7 100%)",
-    },
-    {
-      title: "THat'XXX",
-      artist: "Isaiah Rashad",
-      gradient: "linear-gradient(135deg,#fce4ec 0%,#f8bbd0 100%)",
-    },
-    {
-      title: "Telefone",
-      artist: "Noname",
-      gradient: "linear-gradient(135deg,#e8eaf6 0%,#c5cae9 100%)",
-    },
-    {
-      title: "Free Lunch",
-      artist: "Isaiah Rashad",
-      gradient: "linear-gradient(135deg,#e1f5fe 0%,#b3e5fc 100%)",
-    },
-  ],
-  "Hip-Hop-2": [
-    {
-      title: "Braindrops",
-      artist: "Pink Siifu",
-      gradient: "linear-gradient(135deg,#4a4e69 0%,#9a8c98 100%)",
-    },
-    {
-      title: "Wool",
-      artist: "billy woods",
-      gradient: "linear-gradient(135deg,#5d4037 0%,#4e342e 100%)",
-    },
-    {
-      title: "Drift",
-      artist: "Injury Reserve",
-      gradient: "linear-gradient(135deg,#37474f 0%,#263238 100%)",
-    },
-    {
-      title: "Simple Simon",
-      artist: "Milo",
-      gradient: "linear-gradient(135deg,#efebe9 0%,#d7ccc8 100%)",
-    },
-    {
-      title: "Westside Bound 3",
-      artist: "Your Old Droog",
-      gradient: "linear-gradient(135deg,#90a955 0%,#4f772d 100%)",
-    },
-    {
-      title: "Talk to Me",
-      artist: "Armand Hammer",
-      gradient: "linear-gradient(135deg,#3e2723 0%,#4e342e 100%)",
-    },
-    {
-      title: "Furtive Movements",
-      artist: "billy woods",
-      gradient: "linear-gradient(135deg,#263238 0%,#37474f 100%)",
-    },
-    {
-      title: "Outside",
-      artist: "Milo",
-      gradient: "linear-gradient(135deg,#f3e5f5 0%,#e1bee7 100%)",
-    },
-    {
-      title: "Swerve City",
-      artist: "Doomtree",
-      gradient: "linear-gradient(135deg,#e2b96f 0%,#c8843e 100%)",
-    },
-    {
-      title: "An Idea",
-      artist: "Pink Siifu",
-      gradient: "linear-gradient(135deg,#e8f5e9 0%,#c8e6c9 100%)",
-    },
-  ],
-  "Indie-0": [
-    {
-      title: "Electric Feel",
-      artist: "MGMT",
-      gradient: "linear-gradient(135deg,#7400b8 0%,#6930c3 100%)",
-    },
-    {
-      title: "Dog Days Are Over",
-      artist: "Florence + The Machine",
-      gradient: "linear-gradient(135deg,#f4d35e 0%,#ee964b 100%)",
-    },
-    {
-      title: "Ho Hey",
-      artist: "The Lumineers",
-      gradient: "linear-gradient(135deg,#fff176 0%,#ffd54f 100%)",
-    },
-    {
-      title: "Little Talks",
-      artist: "Of Monsters and Men",
-      gradient: "linear-gradient(135deg,#b3e5fc 0%,#81d4fa 100%)",
-    },
-    {
-      title: "Tongue Tied",
-      artist: "Grouplove",
-      gradient: "linear-gradient(135deg,#f48fb1 0%,#f06292 100%)",
-    },
-    {
-      title: "Kids",
-      artist: "MGMT",
-      gradient: "linear-gradient(135deg,#ce93d8 0%,#ab47bc 100%)",
-    },
-    {
-      title: "Take Me Out",
-      artist: "Franz Ferdinand",
-      gradient: "linear-gradient(135deg,#f72585 0%,#560bad 100%)",
-    },
-    {
-      title: "Pumped Up Kicks",
-      artist: "Foster the People",
-      gradient: "linear-gradient(135deg,#80cbc4 0%,#4db6ac 100%)",
-    },
-    {
-      title: "Such Great Heights",
-      artist: "The Postal Service",
-      gradient: "linear-gradient(135deg,#81d4fa 0%,#4fc3f7 100%)",
-    },
-    {
-      title: "Home",
-      artist: "Edward Sharpe & The Magnetic Zeros",
-      gradient: "linear-gradient(135deg,#ffe082 0%,#ffd54f 100%)",
-    },
-  ],
-  "Indie-1": [
-    {
-      title: "First Day of My Life",
-      artist: "Bright Eyes",
-      gradient: "linear-gradient(135deg,#ffe0b2 0%,#ffcc80 100%)",
-    },
-    {
-      title: "Punisher",
-      artist: "Phoebe Bridgers",
-      gradient: "linear-gradient(135deg,#d4e09b 0%,#a7c957 100%)",
-    },
-    {
-      title: "Lua",
-      artist: "Bright Eyes",
-      gradient: "linear-gradient(135deg,#ffecd2 0%,#fcb69f 100%)",
-    },
-    {
-      title: "Moon River",
-      artist: "Frank Ocean",
-      gradient: "linear-gradient(135deg,#e3f2fd 0%,#bbdefb 100%)",
-    },
-    {
-      title: "Ivy",
-      artist: "Frank Ocean",
-      gradient: "linear-gradient(135deg,#a8e6cf 0%,#dcedc1 100%)",
-    },
-    {
-      title: "Georgia",
-      artist: "Benson Boone",
-      gradient: "linear-gradient(135deg,#e2d9f3 0%,#b5a8d8 100%)",
-    },
-    {
-      title: "In My Arms",
-      artist: "Maisie Peters",
-      gradient: "linear-gradient(135deg,#ffccd5 0%,#ff85a1 100%)",
-    },
-    {
-      title: "Ribs",
-      artist: "Lorde",
-      gradient: "linear-gradient(135deg,#e8eaf6 0%,#c5cae9 100%)",
-    },
-    {
-      title: "You Are the Best Thing",
-      artist: "Ray LaMontagne",
-      gradient: "linear-gradient(135deg,#f9fbe7 0%,#f0f4c3 100%)",
-    },
-    {
-      title: "Four Women",
-      artist: "Nina Simone",
-      gradient: "linear-gradient(135deg,#e8eaf6 0%,#c5cae9 100%)",
-    },
-  ],
-  "Indie-2": [
-    {
-      title: "Stranger",
-      artist: "Jordana",
-      gradient: "linear-gradient(135deg,#f7cad0 0%,#ffe8d6 100%)",
-    },
-    {
-      title: "Savior Complex",
-      artist: "Phoebe Bridgers",
-      gradient: "linear-gradient(135deg,#c3b1e1 0%,#e8d5f5 100%)",
-    },
-    {
-      title: "Honey",
-      artist: "Hovvdy",
-      gradient: "linear-gradient(135deg,#fff9c4 0%,#fff59d 100%)",
-    },
-    {
-      title: "Clarity",
-      artist: "Raveena",
-      gradient: "linear-gradient(135deg,#fce4ec 0%,#f8bbd0 100%)",
-    },
-    {
-      title: "We Fell in Love in October",
-      artist: "girl in red",
-      gradient: "linear-gradient(135deg,#f3e5f5 0%,#e1bee7 100%)",
-    },
-    {
-      title: "Some",
-      artist: "girl in red",
-      gradient: "linear-gradient(135deg,#e91e63 0%,#c2185b 100%)",
-    },
-    {
-      title: "Dark Red",
-      artist: "Steve Lacy",
-      gradient: "linear-gradient(135deg,#b71c1c 0%,#c62828 100%)",
-    },
-    {
-      title: "Nobody's Watching",
-      artist: "Waxahatchee",
-      gradient: "linear-gradient(135deg,#fff3e0 0%,#ffe0b2 100%)",
-    },
-    {
-      title: "Devotion",
-      artist: "Hurray for the Riff Raff",
-      gradient: "linear-gradient(135deg,#e8f5e9 0%,#c8e6c9 100%)",
-    },
-    {
-      title: "Bound 2",
-      artist: "Kanye West",
-      gradient: "linear-gradient(135deg,#ff8f00 0%,#ff6f00 100%)",
-    },
-  ],
-  "R&B-0": [
-    {
-      title: "Essence",
-      artist: "Wizkid ft. Tems",
-      gradient: "linear-gradient(135deg,#f4845f 0%,#f2614a 100%)",
-    },
-    {
-      title: "Leave the Door Open",
-      artist: "Bruno Mars & Anderson Paak",
-      gradient: "linear-gradient(135deg,#ffb347 0%,#ff8c00 100%)",
-    },
-    {
-      title: "Good Days",
-      artist: "SZA",
-      gradient: "linear-gradient(135deg,#c9ada7 0%,#9a8c98 100%)",
-    },
-    {
-      title: "Kill Bill",
-      artist: "SZA",
-      gradient: "linear-gradient(135deg,#ff8a80 0%,#ff5252 100%)",
-    },
-    {
-      title: "Golden Hour",
-      artist: "JVKE",
-      gradient: "linear-gradient(135deg,#ffd180 0%,#ffab40 100%)",
-    },
-    {
-      title: "Snooze",
-      artist: "SZA",
-      gradient: "linear-gradient(135deg,#b39ddb 0%,#9575cd 100%)",
-    },
-    {
-      title: "Peaches",
-      artist: "Justin Bieber ft. Daniel Caesar",
-      gradient: "linear-gradient(135deg,#ffa726 0%,#fb8c00 100%)",
-    },
-    {
-      title: "Love Again",
-      artist: "Dua Lipa",
-      gradient: "linear-gradient(135deg,#f8bbd0 0%,#f48fb1 100%)",
-    },
-    {
-      title: "Calling My Phone",
-      artist: "Lil Tjay ft. 6LACK",
-      gradient: "linear-gradient(135deg,#ce93d8 0%,#ba68c8 100%)",
-    },
-    {
-      title: "I Ain't Worried",
-      artist: "OneRepublic",
-      gradient: "linear-gradient(135deg,#80deea 0%,#4dd0e1 100%)",
-    },
-  ],
-  "R&B-1": [
-    {
-      title: "Hurt Me",
-      artist: "Snoh Aalegra",
-      gradient: "linear-gradient(135deg,#f2cdcd 0%,#e0a0b0 100%)",
-    },
-    {
-      title: "On and On",
-      artist: "Erykah Badu",
-      gradient: "linear-gradient(135deg,#fbb1bd 0%,#ee82ee 100%)",
-    },
-    {
-      title: "Make Me Feel",
-      artist: "Janelle Monae",
-      gradient: "linear-gradient(135deg,#ea80fc 0%,#e040fb 100%)",
-    },
-    {
-      title: "Bloom",
-      artist: "Troye Sivan",
-      gradient: "linear-gradient(135deg,#fce4ec 0%,#f48fb1 100%)",
-    },
-    {
-      title: "Look What You're Doing to Me",
-      artist: "Snoh Aalegra ft. A$AP Rocky",
-      gradient: "linear-gradient(135deg,#f3e5f5 0%,#e1bee7 100%)",
-    },
-    {
-      title: "Colors",
-      artist: "Halsey",
-      gradient: "linear-gradient(135deg,#e3f2fd 0%,#90caf9 100%)",
-    },
-    {
-      title: "You Should Be Sad",
-      artist: "Halsey",
-      gradient: "linear-gradient(135deg,#ffe8d6 0%,#f8c8a0 100%)",
-    },
-    {
-      title: "Crybaby",
-      artist: "Melanie Martinez",
-      gradient: "linear-gradient(135deg,#f8bbd0 0%,#f06292 100%)",
-    },
-    {
-      title: "Soap",
-      artist: "Melanie Martinez",
-      gradient: "linear-gradient(135deg,#b3e5fc 0%,#81d4fa 100%)",
-    },
-    {
-      title: "Wrong",
-      artist: "MAX ft. Lil Uzi Vert",
-      gradient: "linear-gradient(135deg,#1a237e 0%,#283593 100%)",
-    },
-  ],
-  "R&B-2": [
-    {
-      title: "Do You Feel Me",
-      artist: "Kadhja Bonet",
-      gradient: "linear-gradient(135deg,#b5838d 0%,#e5989b 100%)",
-    },
-    {
-      title: "Cranes in the Sky",
-      artist: "Solange",
-      gradient: "linear-gradient(135deg,#ffb4a2 0%,#e5989b 100%)",
-    },
-    {
-      title: "Free Mind",
-      artist: "Tems",
-      gradient: "linear-gradient(135deg,#a9dfbf 0%,#76b041 100%)",
-    },
-    {
-      title: "Bed",
-      artist: "Anaiis",
-      gradient: "linear-gradient(135deg,#6d6875 0%,#b5838d 100%)",
-    },
-    {
-      title: "Superposition",
-      artist: "Young Fathers",
-      gradient: "linear-gradient(135deg,#fdfd96 0%,#ffd700 100%)",
-    },
-    {
-      title: "Butterfly Effect",
-      artist: "Hiatus Kaiyote",
-      gradient: "linear-gradient(135deg,#b2dfdb 0%,#80cbc4 100%)",
-    },
-    {
-      title: "In the Meantime",
-      artist: "Nai Palm",
-      gradient: "linear-gradient(135deg,#a8d8ea 0%,#7ec8e3 100%)",
-    },
-    {
-      title: "Molasses",
-      artist: "Nai Palm",
-      gradient: "linear-gradient(135deg,#fce4ec 0%,#f8bbd0 100%)",
-    },
-    {
-      title: "See Me Now",
-      artist: "Kadhja Bonet",
-      gradient: "linear-gradient(135deg,#d7bde2 0%,#bb8fce 100%)",
-    },
-    {
-      title: "Shaolin Monk Motherfunk",
-      artist: "Hiatus Kaiyote",
-      gradient: "linear-gradient(135deg,#ffe0b2 0%,#ffcc80 100%)",
-    },
-  ],
-  "Jazz-0": [
-    {
-      title: "So What",
-      artist: "Miles Davis",
-      gradient: "linear-gradient(135deg,#023e8a 0%,#0077b6 100%)",
-    },
-    {
-      title: "Take Five",
-      artist: "Dave Brubeck",
-      gradient: "linear-gradient(135deg,#1b4332 0%,#2d6a4f 100%)",
-    },
-    {
-      title: "Round Midnight",
-      artist: "Thelonious Monk",
-      gradient: "linear-gradient(135deg,#10002b 0%,#240046 100%)",
-    },
-    {
-      title: "Autumn Leaves",
-      artist: "Bill Evans",
-      gradient: "linear-gradient(135deg,#bc6c25 0%,#dda15e 100%)",
-    },
-    {
-      title: "My Favorite Things",
-      artist: "John Coltrane",
-      gradient: "linear-gradient(135deg,#e8f5e9 0%,#a5d6a7 100%)",
-    },
-    {
-      title: "A Love Supreme",
-      artist: "John Coltrane",
-      gradient: "linear-gradient(135deg,#1a237e 0%,#283593 100%)",
-    },
-    {
-      title: "Kind of Blue",
-      artist: "Miles Davis",
-      gradient: "linear-gradient(135deg,#0d47a1 0%,#1565c0 100%)",
-    },
-    {
-      title: "Fly Me to the Moon",
-      artist: "Frank Sinatra",
-      gradient: "linear-gradient(135deg,#e3f2fd 0%,#90caf9 100%)",
-    },
-    {
-      title: "Summertime",
-      artist: "Ella Fitzgerald",
-      gradient: "linear-gradient(135deg,#ffe082 0%,#ffd54f 100%)",
-    },
-    {
-      title: "What a Wonderful World",
-      artist: "Louis Armstrong",
-      gradient: "linear-gradient(135deg,#a5d6a7 0%,#81c784 100%)",
-    },
-  ],
-  "Jazz-1": [
-    {
-      title: "Sea of Tranquility",
-      artist: "Cecile McLorin Salvant",
-      gradient: "linear-gradient(135deg,#7a9e7e 0%,#b9d4aa 100%)",
-    },
-    {
-      title: "Everything Is Moving So Fast",
-      artist: "GoGo Penguin",
-      gradient: "linear-gradient(135deg,#3c1642 0%,#086375 100%)",
-    },
-    {
-      title: "Maiden Voyage",
-      artist: "Herbie Hancock",
-      gradient: "linear-gradient(135deg,#48c9b0 0%,#1abc9c 100%)",
-    },
-    {
-      title: "Speak No Evil",
-      artist: "Wayne Shorter",
-      gradient: "linear-gradient(135deg,#2c3e50 0%,#3498db 100%)",
-    },
-    {
-      title: "Alice in Wonderland",
-      artist: "Bill Evans",
-      gradient: "linear-gradient(135deg,#ce93d8 0%,#ab47bc 100%)",
-    },
-    {
-      title: "Joy Spring",
-      artist: "Clifford Brown",
-      gradient: "linear-gradient(135deg,#ffe082 0%,#ffc107 100%)",
-    },
-    {
-      title: "Cherokee",
-      artist: "Charlie Parker",
-      gradient: "linear-gradient(135deg,#4caf50 0%,#388e3c 100%)",
-    },
-    {
-      title: "Celia",
-      artist: "Cécile McLorin Salvant",
-      gradient: "linear-gradient(135deg,#f5cba7 0%,#e59866 100%)",
-    },
-    {
-      title: "Infant Eyes",
-      artist: "Wayne Shorter",
-      gradient: "linear-gradient(135deg,#1a1a2e 0%,#16213e 100%)",
-    },
-    {
-      title: "Nardis",
-      artist: "Bill Evans",
-      gradient: "linear-gradient(135deg,#283593 0%,#1565c0 100%)",
-    },
-  ],
-  "Jazz-2": [
-    {
-      title: "Nardis",
-      artist: "Ahmad Jamal",
-      gradient: "linear-gradient(135deg,#4b3832 0%,#be9b7b 100%)",
-    },
-    {
-      title: "Umi Says",
-      artist: "Mos Def",
-      gradient: "linear-gradient(135deg,#2a4858 0%,#4b8b9e 100%)",
-    },
-    {
-      title: "Spiral",
-      artist: "Shabaka and The Ancestors",
-      gradient: "linear-gradient(135deg,#1a1a1a 0%,#4a4a6a 100%)",
-    },
-    {
-      title: "Planetarium",
-      artist: "Kamaal Williams",
-      gradient: "linear-gradient(135deg,#0d0d2b 0%,#1a1a4e 100%)",
-    },
-    {
-      title: "Afro Blue",
-      artist: "Erykah Badu",
-      gradient: "linear-gradient(135deg,#1c3144 0%,#2e4057 100%)",
-    },
-    {
-      title: "Wu Hen",
-      artist: "Kamaal Williams",
-      gradient: "linear-gradient(135deg,#880e4f 0%,#ad1457 100%)",
-    },
-    {
-      title: "Return to Nowhere",
-      artist: "Sun Ra",
-      gradient: "linear-gradient(135deg,#1a237e 0%,#311b92 100%)",
-    },
-    {
-      title: "Open Channels",
-      artist: "Shabaka and The Ancestors",
-      gradient: "linear-gradient(135deg,#37474f 0%,#263238 100%)",
-    },
-    {
-      title: "Alone Again Or",
-      artist: "Love",
-      gradient: "linear-gradient(135deg,#f57f17 0%,#ff8f00 100%)",
-    },
-    {
-      title: "A House Is Not a Motel",
-      artist: "Love",
-      gradient: "linear-gradient(135deg,#bf360c 0%,#d84315 100%)",
-    },
-  ],
-};
 
 // ── Audio singleton ────────────────────────────────────────────────────────────
 let _audio: HTMLAudioElement | null = null;
@@ -1141,8 +197,6 @@ function SongCard({
           className="absolute inset-0 w-full h-full object-cover"
           style={{ display: song.albumArt ? "block" : "none" }}
         />
-
-        {/* Heard It */}
         <button
           onClick={handleHeard}
           title="Already heard it"
@@ -1161,8 +215,6 @@ function SongCard({
         >
           ✓
         </button>
-
-        {/* Audio pill */}
         {song.previewUrl && (
           <div
             className="absolute bottom-2 left-2 transition-opacity duration-200"
@@ -1186,10 +238,8 @@ function SongCard({
           </div>
         )}
       </div>
-
       <div className="flex flex-col gap-2.5 p-3.5">
         <div>
-          {/* Title row with Spotify link */}
           <div className="flex items-start gap-1.5">
             <h3
               className="font-semibold line-clamp-1 flex-1 text-[14px] leading-snug"
@@ -1289,6 +339,8 @@ function PlaylistDrawer({
   const [exportErr, setExportErr] = useState<string | null>(null);
 
   const handleExport = async () => {
+    // ✅ FIX: Always resolve a fresh token at export time via getValidToken(),
+    // never rely on the oauthToken prop which may be a stale snapshot.
     const token = await getValidToken();
     if (!token) {
       setExportErr("Connect Spotify to export your playlist.");
@@ -1326,7 +378,6 @@ function PlaylistDrawer({
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop */}
           <motion.div
             className="fixed inset-0 z-40"
             style={{
@@ -1338,8 +389,6 @@ function PlaylistDrawer({
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
-
-          {/* Panel */}
           <motion.div
             className="fixed top-0 right-0 h-full z-50 flex flex-col"
             style={{
@@ -1354,7 +403,6 @@ function PlaylistDrawer({
             exit={{ x: 340 }}
             transition={{ type: "spring", stiffness: 320, damping: 32 }}
           >
-            {/* Header */}
             <div
               className="flex items-center justify-between px-5 py-4"
               style={{ borderBottom: `1px solid ${C.border}` }}
@@ -1397,8 +445,6 @@ function PlaylistDrawer({
                 ×
               </button>
             </div>
-
-            {/* Track list */}
             <div
               className="flex-1 overflow-y-auto"
               style={{
@@ -1506,8 +552,6 @@ function PlaylistDrawer({
                 </AnimatePresence>
               )}
             </div>
-
-            {/* Export footer */}
             <div
               className="px-4 py-4"
               style={{ borderTop: `1px solid ${C.border}` }}
@@ -1594,59 +638,43 @@ export default function Home() {
   const [usingLiveApi, setUsingLiveApi] = useState(false);
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // ✅ FIX: Track whether the OAuth callback has been handled in this session.
+  // Using a ref (not state) so it never triggers a re-render.
   const callbackHandled = useRef(false);
+
+  // ✅ FIX: Track whether oauthAuthed just flipped true so we can trigger
+  // one immediate fetch without adding oauthAuthed to the filter useEffect deps.
+  const prevAuthed = useRef(false);
 
   const C: Theme = darkMode ? DARK : LIGHT;
 
-  // ── OAuth callback ────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (callbackHandled.current) return;
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-    if (!code) return;
-    callbackHandled.current = true;
-    handleOAuthCallback(code).then((token) => {
-      if (token) {
-        setOauthToken(token);
-        setOauthAuthed(true);
-      }
-      window.history.replaceState({}, "", window.location.pathname);
-    });
-  }, []);
-
-  // ── Fetch from Spotify with optional random offset ────────────────────────
+  // ── fetchTracks ────────────────────────────────────────────────────────────
+  // ✅ FIX: useCallback deps are now [] (stable forever).
+  // Token is resolved INSIDE the function via getValidToken() at call-time,
+  // never closed over from stale state. This breaks the race condition where
+  // oauthToken/oauthAuthed hadn't updated yet when the effect fired.
   const fetchTracks = useCallback(
     async (genre: string, level: number, lang: string, offset = 0) => {
-      // Clear grid immediately so stale tracks never show under new filters
       setTracks([]);
       setApiError(null);
       setGridStatus(null);
 
-      // Resolve OAuth token (attempt refresh if stored but near-expiry)
-      let token: string | null = null;
-      if (oauthAuthed || oauthToken) {
-        const refreshed = await getValidToken();
-        if (refreshed) {
-          token = refreshed;
-          setOauthToken(refreshed);
-        }
-      }
+      // Always resolve the freshest possible token right now, not from closure
+      const token = await getValidToken();
 
-      // No valid token → prompt the user to connect, leave grid empty
       if (!token) {
-        console.log(
-          "[niche] No active Spotify token — awaiting OAuth connection.",
-        );
         setUsingLiveApi(false);
         setGridStatus("not-connected");
         return;
       }
 
+      // Keep UI state in sync with whatever token we actually resolved
+      setOauthToken(token);
+
       setLoading(true);
       try {
         const langParam = lang === "All" ? "" : lang;
-        const q = `genre:"${genre}"${langParam ? ` "${langParam}"` : ""}`;
-        console.log(`[niche] Spotify search → ${q} | offset=${offset}`);
         const pool = await fetchSpotifyPool(
           genre,
           level,
@@ -1656,7 +684,6 @@ export default function Home() {
         );
 
         if (pool.length === 0) {
-          console.log("[niche] No previewable tracks found for this query.");
           setGridStatus("empty");
           setUsingLiveApi(false);
         } else {
@@ -1666,8 +693,10 @@ export default function Home() {
         }
       } catch (err) {
         if (err instanceof SpotifyAuthError) {
-          // Token rejected by Spotify — clear session, prompt reconnect
-          console.log(
+          // ✅ FIX: Only clear auth on a hard Spotify rejection of a real API
+          // call, never during the OAuth handshake (which happens before this
+          // code path is ever reached).
+          console.warn(
             "[niche] Spotify rejected token (401/403) — clearing auth.",
           );
           clearAuth();
@@ -1676,7 +705,6 @@ export default function Home() {
           setUsingLiveApi(false);
           setGridStatus("not-connected");
         } else {
-          // Unexpected API error (5xx, rate limit, network)
           const msg = err instanceof Error ? err.message : String(err);
           console.error("[niche] Spotify API error:", msg);
           setApiError(msg);
@@ -1687,28 +715,73 @@ export default function Home() {
         setLoading(false);
       }
     },
-    [oauthToken, oauthAuthed],
+    // ✅ Stable — no token/auth deps. getValidToken() reads localStorage fresh each call.
+    [],
   );
 
-  // Re-fetch whenever filters change (offset=0 for new filter)
+  // ── OAuth callback handler ─────────────────────────────────────────────────
+  // ✅ FIX: We no longer clean the URL *before* the async exchange completes.
+  // The old code did replaceState inside the .then() which raced with React's
+  // re-render. Now we clean the URL only after tokens are saved, and we update
+  // auth state *before* triggering any fetch.
+  useEffect(() => {
+    if (callbackHandled.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (!code) return;
+
+    callbackHandled.current = true;
+
+    handleOAuthCallback(code).then((token) => {
+      // Clean up the URL first so a page refresh doesn't re-attempt the exchange
+      window.history.replaceState({}, "", window.location.pathname);
+
+      if (token) {
+        // Set both pieces of auth state together. The prevAuthed effect below
+        // will see oauthAuthed flip from false→true and trigger the first fetch.
+        setOauthToken(token);
+        setOauthAuthed(true);
+      }
+    });
+  }, []);
+
+  // ── Trigger first fetch after OAuth login ──────────────────────────────────
+  // ✅ FIX: A dedicated effect watches for oauthAuthed flipping true and fires
+  // exactly one fetch. This decouples "just logged in" from the filter-change
+  // effect below, preventing the double-fetch race.
+  useEffect(() => {
+    if (oauthAuthed && !prevAuthed.current) {
+      prevAuthed.current = true;
+      const genreKey = customGenre.trim() || activeGenre;
+      fetchTracks(genreKey, obscurity, language, 0);
+    }
+    if (!oauthAuthed) {
+      prevAuthed.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [oauthAuthed]);
+
+  // ── Re-fetch on filter changes ─────────────────────────────────────────────
+  // ✅ FIX: fetchTracks is now stable ([] deps) so it's safe to omit from this
+  // array. We also no longer include oauthToken/oauthAuthed here — token
+  // resolution is handled inside fetchTracks itself.
   useEffect(() => {
     const genreKey = customGenre.trim() || activeGenre;
     fetchTracks(genreKey, obscurity, language, 0);
-  }, [activeGenre, obscurity, customGenre, language, fetchTracks]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeGenre, obscurity, customGenre, language]);
 
-  // "Get Fresh Set" — brand-new API call with randomised offset
+  // ── "Get Fresh Set" ────────────────────────────────────────────────────────
   const getFreshSet = () => {
     const genreKey = customGenre.trim() || activeGenre;
     const offset = Math.floor(Math.random() * 35);
     fetchTracks(genreKey, obscurity, language, offset);
   };
 
-  // "Already Heard It" — remove and refetch 1 replacement from Spotify (best-effort)
   const markHeard = (heardTrack: Track) => {
     setTracks((prev) => prev.filter((t) => t !== heardTrack));
   };
 
-  // Auth handlers
   const handleConnect = async () => {
     if (!hasClientId()) {
       alert("VITE_SPOTIFY_CLIENT_ID is not configured.");
@@ -1720,10 +793,14 @@ export default function Home() {
       console.error(e);
     }
   };
+
   const handleDisconnect = () => {
     clearAuth();
     setOauthToken(null);
     setOauthAuthed(false);
+    // Show the not-connected empty state immediately on disconnect
+    setTracks([]);
+    setGridStatus("not-connected");
   };
 
   const handleSurprise = () => {
@@ -1754,7 +831,6 @@ export default function Home() {
         transition: "background 0.35s, color 0.35s",
       }}
     >
-      {/* Playlist Drawer */}
       <PlaylistDrawer
         open={drawerOpen}
         C={C}
@@ -1798,7 +874,6 @@ export default function Home() {
                 Music made for you, not the algorithm.
               </p>
             </div>
-            {/* Dark mode toggle */}
             <button
               onClick={() => setDarkMode((d) => !d)}
               title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
@@ -1863,7 +938,7 @@ export default function Home() {
             </button>
           )}
 
-          {/* Status */}
+          {/* Status banners */}
           {usingLiveApi && !oauthAuthed && (
             <div
               style={{
@@ -1895,7 +970,7 @@ export default function Home() {
               }}
             >
               <p style={{ color: "#E65100", fontSize: "0.72rem" }}>
-                Spotify API error — showing curated picks
+                Spotify API error — check console for details
               </p>
             </div>
           )}
@@ -2105,7 +1180,6 @@ export default function Home() {
 
         {/* ── Right Panel ── */}
         <main className="flex-1 flex flex-col min-w-0">
-          {/* Header row */}
           <div className="flex items-end justify-between mb-5 gap-4">
             <div>
               <h2
@@ -2144,10 +1218,7 @@ export default function Home() {
                 )}
               </p>
             </div>
-
-            {/* Controls: playlist button + Get Fresh Set */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Playlist toggle */}
               <button
                 onClick={() => setDrawerOpen(true)}
                 className="relative flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-medium transition-all hover:brightness-[0.96] active:scale-[0.97]"
@@ -2176,8 +1247,6 @@ export default function Home() {
                   </span>
                 )}
               </button>
-
-              {/* Get Fresh Set */}
               <button
                 onClick={getFreshSet}
                 disabled={loading}
@@ -2216,7 +1285,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Grid: 2 cols mobile, 5 cols tablet+ */}
+          {/* Grid */}
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
               {Array.from({ length: PAGE_SIZE }).map((_, i) => (
@@ -2224,7 +1293,6 @@ export default function Home() {
               ))}
             </div>
           ) : gridStatus !== null ? (
-            /* ── Empty states ────────────────────────────────────────────── */
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -2288,7 +1356,7 @@ export default function Home() {
                       marginBottom: 8,
                     }}
                   >
-                    No previewable tracks found
+                    No tracks found for this combination
                   </p>
                   <p
                     style={{
