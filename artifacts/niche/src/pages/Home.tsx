@@ -153,6 +153,7 @@ function SongCard({
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
+    console.log("[niche] + Add to Playlist clicked:", song.title);
     setAdded(true);
     onAdd();
     setTimeout(() => setAdded(false), 2000);
@@ -160,6 +161,7 @@ function SongCard({
 
   const handleHeard = (e: React.MouseEvent) => {
     e.stopPropagation();
+    console.log("[niche] ✓ Heard button clicked:", song.title);
     stopAudioPreview();
     setPlaying(false);
     onHeard();
@@ -167,6 +169,12 @@ function SongCard({
 
   const handleBinAction = (e: React.MouseEvent) => {
     e.stopPropagation();
+    console.log(
+      "[niche] × Bin button clicked:",
+      song.title,
+      "spotifyId =",
+      song.spotifyId,
+    );
     stopAudioPreview();
     setPlaying(false);
     onToggleBin();
@@ -215,7 +223,6 @@ function SongCard({
           {!isBinView && (
             <button
               onClick={handleHeard}
-              onClickCapture={(e) => e.stopPropagation()}
               title="Already heard it"
               className="flex items-center justify-center transition-all duration-150 hover:scale-110 active:scale-95"
               style={{
@@ -228,6 +235,8 @@ function SongCard({
                 color: "#8A7E79",
                 fontSize: 12,
                 boxShadow: "0 1px 4px rgba(44,36,32,0.14)",
+                position: "relative",
+                zIndex: 10,
               }}
             >
               ✓
@@ -236,7 +245,6 @@ function SongCard({
 
           <button
             onClick={handleBinAction}
-            onClickCapture={(e) => e.stopPropagation()}
             title={
               isBinView ? "Restore to collection" : "Remove from collection"
             }
@@ -251,6 +259,8 @@ function SongCard({
               border: "1px solid rgba(0,0,0,0.05)",
               color: "white",
               boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+              position: "relative",
+              zIndex: 10,
             }}
           >
             {isBinView ? "↺" : "×"}
