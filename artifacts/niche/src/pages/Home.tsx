@@ -151,15 +151,7 @@ function SongCard({
   const [added, setAdded] = useState(false);
   const [playing, setPlaying] = useState(false);
 
-  const handleAdd = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    console.log("[niche] + Add to Playlist clicked:", song.title);
-    setAdded(true);
-    onAdd();
-    setTimeout(() => setAdded(false), 2000);
-  };
-
-  const handleHeard = (e: React.MouseEvent) => {
+  const handleHeardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     console.log("[niche] ✓ Heard button clicked:", song.title);
     stopAudioPreview();
@@ -167,10 +159,10 @@ function SongCard({
     onHeard();
   };
 
-  const handleBinAction = (e: React.MouseEvent) => {
+  const handleBinClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     console.log(
-      "[niche] × Bin button clicked:",
+      "[niche] × Bin action clicked:",
       song.title,
       "spotifyId =",
       song.spotifyId,
@@ -178,6 +170,18 @@ function SongCard({
     stopAudioPreview();
     setPlaying(false);
     onToggleBin();
+  };
+
+  const handleActionClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isBinView) {
+      onToggleBin();
+    } else {
+      console.log("[niche] + Add to Playlist clicked:", song.title);
+      setAdded(true);
+      onAdd();
+      setTimeout(() => setAdded(false), 2000);
+    }
   };
 
   const handleMouseEnter = () => {
@@ -218,49 +222,28 @@ function SongCard({
           style={{ display: song.albumArt ? "block" : "none" }}
         />
 
-        {/* Top Right Action Row */}
-        <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-150">
+        {/* Top Right Action Overlay Row */}
+        <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-150 z-20">
           {!isBinView && (
             <button
-              onClick={handleHeard}
+              onClick={handleHeardClick}
               title="Already heard it"
-              className="flex items-center justify-center transition-all duration-150 hover:scale-110 active:scale-95"
-              style={{
-                width: 26,
-                height: 26,
-                borderRadius: "50%",
-                background: "rgba(251,249,246,0.90)",
-                backdropFilter: "blur(6px)",
-                border: "1px solid rgba(44,36,32,0.12)",
-                color: "#8A7E79",
-                fontSize: 12,
-                boxShadow: "0 1px 4px rgba(44,36,32,0.14)",
-                position: "relative",
-                zIndex: 10,
-              }}
+              className="flex items-center justify-center rounded-full bg-white/90 text-neutral-500 shadow border w-6 h-6 hover:scale-110 text-xs font-bold transition-transform"
             >
               ✓
             </button>
           )}
 
           <button
-            onClick={handleBinAction}
+            onClick={handleBinClick}
             title={
               isBinView ? "Restore to collection" : "Remove from collection"
             }
-            className="flex items-center justify-center transition-all duration-150 hover:scale-110 active:scale-95 text-xs font-bold"
+            className="flex items-center justify-center rounded-full text-white w-6 h-6 hover:scale-110 text-xs font-bold transition-transform"
             style={{
-              width: 26,
-              height: 26,
-              borderRadius: "50%",
               background: isBinView
                 ? "rgba(29,185,84,0.95)"
                 : "rgba(239,68,68,0.95)",
-              border: "1px solid rgba(0,0,0,0.05)",
-              color: "white",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
-              position: "relative",
-              zIndex: 10,
             }}
           >
             {isBinView ? "↺" : "×"}
@@ -322,8 +305,8 @@ function SongCard({
           </p>
         </div>
         <button
-          onClick={isBinView ? handleBinAction : handleAdd}
-          className="w-full py-2 rounded-full text-xs font-semibold transition-all duration-200"
+          onClick={handleActionClick}
+          className="w-full py-2 rounded-full text-xs font-semibold text-white transition-colors"
           style={{
             backgroundColor: isBinView
               ? "#1DB954"
@@ -698,8 +681,6 @@ export default function Home() {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // ── 🗑️ Trash Bin Core States ────────────────────────────────────────────────
-  // Safely parsed: malformed/corrupted localStorage data no longer crashes
-  // the app on load — it just resets the bin and logs a warning.
   const [binnedTrackIds, setBinnedTrackIds] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem(BIN_STORAGE_KEY);
@@ -837,7 +818,9 @@ export default function Home() {
   };
 
   const markHeard = (heardTrack: Track) => {
-    setTracks((prev) => prev.filter((t) => t !== heardTrack));
+    setTracks((prev) =>
+      prev.filter((t) => t.spotifyId !== heardTrack.spotifyId),
+    );
   };
 
   const handleConnect = async () => {
@@ -882,9 +865,6 @@ export default function Home() {
   };
 
   // ── 🗑️ Trash Bin Operation Handlers ────────────────────────────────────────
-  // Guards against empty/undefined spotifyId so distinct ID-less tracks never
-  // collapse into a single "" bin entry, and wraps the localStorage write in
-  // a try/catch so a full or disabled storage quota doesn't crash the app.
   const toggleTrackBinState = (trackId: string | undefined) => {
     if (!trackId) {
       console.warn(
@@ -906,9 +886,7 @@ export default function Home() {
     }
   };
 
-  // Filter local render pools dynamically based on Bin Toggle context.
-  // Tracks without a spotifyId are never treated as binned, so they can't
-  // be hidden by an unrelated bin entry.
+  // Filter local render pools dynamically based on Bin Toggle context
   const filteredTracks = tracks.filter((t) => {
     const isBinned = !!t.spotifyId && binnedTrackIds.includes(t.spotifyId);
     return showBinOnly ? isBinned : !isBinned;
