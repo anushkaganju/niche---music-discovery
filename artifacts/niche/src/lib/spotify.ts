@@ -133,6 +133,20 @@ const CURATED_PLAYLISTS: Record<string, string> = {
   "Pop-0": "5tqpfFWqH2fQHVcQacxSUM", // Familiar
   "Pop-1": "44hUsnbEMWLPGRJQz2fU77", // Niche
   "Pop-2": "40C3boyV3eJ2UkKQJPacQh", // Hidden Gems
+
+  // Hip-hop — general
+  "Hip-Hop-0": "1m6xlxnsJfcBQMUfFyfpZz", // Familiar
+  "Hip-Hop-1": "1Qb8jj2vEHmu36sPo1wCE4", // Niche
+  "Hip-Hop-2": "2SKyylbdKFFwue3qos3Zv7", // Hidden Gems
+
+  // Rock — general
+  "Rock-0": "25v9Zsc9D1Y7Xy7Aas3m8b", // Familiar
+  "Rock-1": "6GUoOxXMiqYOUa0Z5M7Fxi", // Niche
+  "Rock-2": "6BAjBtxAbapSLFB2p26Zel", // Hidden Gems
+
+  // Rock — Hindi-specific
+  "Rock-0-Hindi": "6OXaoriC1g1d0WPAPYtxTP", // Familiar
+  "Rock-1-Hindi": "3qOP6o4xy26hFlNq3pXAWb", // Niche
 };
 
 function getCuratedPlaylistId(
@@ -153,8 +167,13 @@ function buildQuery(genre: string, language: string): string {
   const seed =
     GENRE_SEARCH_MAP[genre] ??
     genre.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "n");
-  const langPart = language && language !== "All" ? ` "${language}"` : "";
-  return `genre:"${seed}"${langPart}`;
+
+  if (language && language !== "All") {
+    return `genre:"${seed}" "${language}"`;
+  }
+
+  // Stricter parameters to stop language leakage during English/All searches
+  return `genre:"${seed}" NOT "Hindi" NOT "Bollywood" NOT "Punjabi"`;
 }
 
 function mapSearchTrack(
@@ -174,10 +193,6 @@ function mapSearchTrack(
   };
 }
 
-/**
- * Fetch tracks from a curated playlist. Returns null on 403 or 404 so that
- * the pool manager can fall back to search instead of kicking the user out.
- */
 async function fetchTracksFromPlaylist(
   playlistId: string,
   seed: string,
@@ -189,14 +204,14 @@ async function fetchTracksFromPlaylist(
   });
 
   if (res.status === 401) {
-    throw new SpotifyAuthError(res.status); // Session dead -> Re-authenticate
+    throw new SpotifyAuthError(res.status);
   }
 
   if (res.status === 403 || res.status === 404) {
     console.warn(
       `[niche] Playlist ${playlistId} restricted or unavailable (${res.status}). Falling back to search.`,
     );
-    return null; // Don't crash, signal fallback
+    return null;
   }
 
   if (!res.ok) {
@@ -271,9 +286,6 @@ async function fetchTracksFromSearch(
   return shuffled.map((track, i) => mapSearchTrack(track, seed, i));
 }
 
-/**
- * Curated playlist pool manager with immediate search fallback safety.
- */
 export async function fetchSpotifyPool(
   genre: string,
   obscurity: number,
@@ -293,11 +305,10 @@ export async function fetchSpotifyPool(
       accessToken,
     );
     if (fromPlaylist && fromPlaylist.length > 0) {
-      return fromPlaylist; // Loaded your public tracks perfectly!
+      return fromPlaylist;
     }
   }
 
-  // Fallback seamlessly if the requested map is empty or hasn't been set up yet
   return fetchTracksFromSearch(genre, obscurity, accessToken, language, offset);
 }
 

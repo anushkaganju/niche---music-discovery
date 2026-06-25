@@ -135,13 +135,17 @@ function stopAudioPreview() {
 function SongCard({
   song,
   C,
+  isBinView,
   onHeard,
   onAdd,
+  onToggleBin,
 }: {
   song: Track;
   C: Theme;
+  isBinView: boolean;
   onHeard: () => void;
   onAdd: () => void;
+  onToggleBin: () => void;
 }) {
   const [added, setAdded] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -160,6 +164,13 @@ function SongCard({
     onHeard();
   };
 
+  const handleBinAction = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    stopAudioPreview();
+    setPlaying(false);
+    onToggleBin();
+  };
+
   const handleMouseEnter = () => {
     if (song.previewUrl) {
       playAudioPreview(song.previewUrl);
@@ -174,7 +185,7 @@ function SongCard({
 
   return (
     <div
-      className="flex flex-col group"
+      className="flex flex-col group relative"
       style={{
         background: C.bgCard,
         borderRadius: "12px",
@@ -197,24 +208,54 @@ function SongCard({
           className="absolute inset-0 w-full h-full object-cover"
           style={{ display: song.albumArt ? "block" : "none" }}
         />
-        <button
-          onClick={handleHeard}
-          title="Already heard it"
-          className="absolute top-2 right-2 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-150 hover:scale-110 active:scale-95"
-          style={{
-            width: 26,
-            height: 26,
-            borderRadius: "50%",
-            background: "rgba(251,249,246,0.90)",
-            backdropFilter: "blur(6px)",
-            border: "1px solid rgba(44,36,32,0.12)",
-            color: "#8A7E79",
-            fontSize: 12,
-            boxShadow: "0 1px 4px rgba(44,36,32,0.14)",
-          }}
-        >
-          ✓
-        </button>
+
+        {/* Top Right Action Row */}
+        <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-150">
+          {!isBinView && (
+            <button
+              onClick={handleHeard}
+              onClickCapture={(e) => e.stopPropagation()}
+              title="Already heard it"
+              className="flex items-center justify-center transition-all duration-150 hover:scale-110 active:scale-95"
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: "50%",
+                background: "rgba(251,249,246,0.90)",
+                backdropFilter: "blur(6px)",
+                border: "1px solid rgba(44,36,32,0.12)",
+                color: "#8A7E79",
+                fontSize: 12,
+                boxShadow: "0 1px 4px rgba(44,36,32,0.14)",
+              }}
+            >
+              ✓
+            </button>
+          )}
+
+          <button
+            onClick={handleBinAction}
+            onClickCapture={(e) => e.stopPropagation()}
+            title={
+              isBinView ? "Restore to collection" : "Remove from collection"
+            }
+            className="flex items-center justify-center transition-all duration-150 hover:scale-110 active:scale-95 text-xs font-bold"
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: "50%",
+              background: isBinView
+                ? "rgba(29,185,84,0.95)"
+                : "rgba(239,68,68,0.95)",
+              border: "1px solid rgba(0,0,0,0.05)",
+              color: "white",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+            }}
+          >
+            {isBinView ? "↺" : "×"}
+          </button>
+        </div>
+
         {song.previewUrl && (
           <div
             className="absolute bottom-2 left-2 transition-opacity duration-200"
@@ -270,15 +311,23 @@ function SongCard({
           </p>
         </div>
         <button
-          onClick={handleAdd}
+          onClick={isBinView ? handleBinAction : handleAdd}
           className="w-full py-2 rounded-full text-xs font-semibold transition-all duration-200"
           style={{
-            backgroundColor: added ? C.accentHover : C.accent,
+            backgroundColor: isBinView
+              ? "#1DB954"
+              : added
+                ? C.accentHover
+                : C.accent,
             color: "white",
             letterSpacing: "0.01em",
           }}
         >
-          {added ? "✓ Saved!" : "+ Add to Playlist"}
+          {isBinView
+            ? "Restore Track"
+            : added
+              ? "✓ Saved!"
+              : "+ Add to Playlist"}
         </button>
       </div>
     </div>
@@ -637,6 +686,13 @@ export default function Home() {
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  // ── 🗑️ Trash Bin Core States ────────────────────────────────────────────────
+  const [binnedTrackIds, setBinnedTrackIds] = useState<string[]>(() => {
+    const saved = localStorage.getItem("niche_binned_tracks");
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [showBinOnly, setShowBinOnly] = useState<boolean>(false);
+
   const callbackHandled = useRef(false);
   const prevAuthed = useRef(false);
 
@@ -686,7 +742,7 @@ export default function Home() {
           setGridStatus("empty");
           setUsingLiveApi(false);
         } else {
-          setTracks(pool.slice(0, PAGE_SIZE));
+          setTracks(pool);
           setUsingLiveApi(true);
           setGridStatus(null);
         }
@@ -761,7 +817,6 @@ export default function Home() {
     setTracks((prev) => prev.filter((t) => t !== heardTrack));
   };
 
-  // ✅ FIXED: Reinforced with explicit error logging and an alert trigger
   const handleConnect = async () => {
     console.log("[Home] Connect Spotify clicked");
     if (!hasClientId()) {
@@ -803,6 +858,25 @@ export default function Home() {
     );
   };
 
+  // ── 🗑️ Trash Bin Operation Handlers ────────────────────────────────────────
+  const toggleTrackBinState = (trackId: string) => {
+    let updated: string[];
+    if (binnedTrackIds.includes(trackId)) {
+      updated = binnedTrackIds.filter((id) => id !== trackId);
+    } else {
+      updated = [...binnedTrackIds, trackId];
+    }
+    setBinnedTrackIds(updated);
+    localStorage.setItem("niche_binned_tracks", JSON.stringify(updated));
+  };
+
+  // Filter local render pools dynamically based on Bin Toggle context
+  const filteredTracks = tracks.filter((t) => {
+    const isBinned = binnedTrackIds.includes(t.spotifyId || "");
+    return showBinOnly ? isBinned : !isBinned;
+  });
+
+  const displayTracks = filteredTracks.slice(0, PAGE_SIZE);
   const displayGenre = customGenre.trim() || activeGenre;
 
   return (
@@ -979,13 +1053,14 @@ export default function Home() {
                 return (
                   <button
                     key={genre}
+                    disabled={showBinOnly}
                     onClick={() => {
                       setActiveGenre(genre);
                       setCustomGenre("");
                     }}
-                    className="py-2 rounded-full font-medium transition-all duration-150 text-sm"
+                    className="py-2 rounded-full font-medium transition-all duration-150 text-sm disabled:opacity-30"
                     style={
-                      isActive
+                      isActive && !showBinOnly
                         ? {
                             backgroundColor: C.bgChipActive,
                             color: C.textChipActive,
@@ -1030,10 +1105,11 @@ export default function Home() {
                 return (
                   <button
                     key={lang}
+                    disabled={showBinOnly}
                     onClick={() => setLanguage(lang)}
-                    className="px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-150"
+                    className="px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-150 disabled:opacity-30"
                     style={
-                      isActive
+                      isActive && !showBinOnly
                         ? {
                             backgroundColor: C.bgChipActive,
                             color: C.textChipActive,
@@ -1070,10 +1146,11 @@ export default function Home() {
             <form onSubmit={(e) => e.preventDefault()} className="flex gap-2">
               <input
                 type="text"
+                disabled={showBinOnly}
                 value={customGenre}
                 onChange={(e) => setCustomGenre(e.target.value)}
                 placeholder="e.g. Bossa Nova, Shoegaze…"
-                className="flex-1 py-2.5 px-4 rounded-full text-sm outline-none"
+                className="flex-1 py-2.5 px-4 rounded-full text-sm outline-none disabled:opacity-30"
                 style={{
                   background: C.bgInput,
                   border: `1.5px solid ${C.borderInput}`,
@@ -1082,6 +1159,7 @@ export default function Home() {
                   transition: "background 0.35s, border 0.35s",
                 }}
                 onFocus={(e) => {
+                  if (showBinOnly) return;
                   e.currentTarget.style.borderColor = C.accent;
                   e.currentTarget.style.boxShadow = `0 0 0 3px ${C.focusRing}`;
                 }}
@@ -1090,7 +1168,7 @@ export default function Home() {
                   e.currentTarget.style.boxShadow = "none";
                 }}
               />
-              {customGenre.trim() && (
+              {customGenre.trim() && !showBinOnly && (
                 <button
                   type="submit"
                   className="px-4 py-2.5 rounded-full text-sm font-medium transition-all active:scale-95"
@@ -1121,11 +1199,14 @@ export default function Home() {
               min="0"
               max="2"
               step="1"
+              disabled={showBinOnly}
               value={obscurity}
               onChange={(e) => setObscurity(Number(e.target.value))}
-              className="custom-range"
+              className="custom-range disabled:opacity-30"
               style={{
-                background: `linear-gradient(to right, ${C.accent} ${(obscurity / 2) * 100}%, ${C.border} ${(obscurity / 2) * 100}%)`,
+                background: showBinOnly
+                  ? C.border
+                  : `linear-gradient(to right, ${C.accent} ${(obscurity / 2) * 100}%, ${C.border} ${(obscurity / 2) * 100}%)`,
               }}
             />
             <div className="flex justify-between">
@@ -1134,8 +1215,9 @@ export default function Home() {
                   key={label}
                   style={{
                     fontSize: "0.72rem",
-                    fontWeight: obscurity === i ? 600 : 400,
-                    color: obscurity === i ? C.accent : C.textLabel,
+                    fontWeight: obscurity === i && !showBinOnly ? 600 : 400,
+                    color:
+                      obscurity === i && !showBinOnly ? C.accent : C.textLabel,
                     transition: "color 0.15s",
                   }}
                 >
@@ -1148,7 +1230,8 @@ export default function Home() {
           {/* Surprise Me */}
           <button
             onClick={handleSurprise}
-            className="w-full py-3 rounded-2xl font-semibold transition-all duration-150 hover:brightness-[0.97] active:scale-[0.98] text-sm"
+            disabled={showBinOnly}
+            className="w-full py-3 rounded-2xl font-semibold transition-all duration-150 hover:brightness-[0.97] active:scale-[0.98] text-sm disabled:opacity-30"
             style={{
               background: C.bgButton,
               border: `1.5px solid ${C.border}`,
@@ -1177,7 +1260,7 @@ export default function Home() {
                   transition: "color 0.35s",
                 }}
               >
-                Your Fresh Finds
+                {showBinOnly ? "Trash Bin Storage" : "Your Fresh Finds"}
               </h2>
               <p
                 style={{
@@ -1187,96 +1270,127 @@ export default function Home() {
                   transition: "color 0.35s",
                 }}
               >
-                Digging into{" "}
-                <span style={{ color: C.text, fontWeight: 600 }}>
-                  {displayGenre}
-                </span>{" "}
-                <span style={{ color: C.accent }}>•</span>{" "}
-                <span>{obscurityLabel(obscurity)}</span>
-                {language !== "All" && (
+                {showBinOnly ? (
+                  <span>
+                    Reviewing items excluded from recommendation tracks
+                  </span>
+                ) : (
                   <>
-                    {" "}
+                    Digging into{" "}
+                    <span style={{ color: C.text, fontWeight: 600 }}>
+                      {displayGenre}
+                    </span>{" "}
                     <span style={{ color: C.accent }}>•</span>{" "}
-                    <span>{language}</span>
+                    <span>{obscurityLabel(obscurity)}</span>
+                    {language !== "All" && (
+                      <>
+                        {" "}
+                        <span style={{ color: C.accent }}>•</span>{" "}
+                        <span>{language}</span>
+                      </>
+                    )}
                   </>
                 )}
               </p>
             </div>
+
+            {/* Control Strip Actions */}
             <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Trash Bin Toggle Control */}
               <button
-                onClick={() => setDrawerOpen(true)}
-                className="relative flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-medium transition-all hover:brightness-[0.96] active:scale-[0.97]"
+                onClick={() => setShowBinOnly(!showBinOnly)}
+                disabled={
+                  loading || (!showBinOnly && binnedTrackIds.length === 0)
+                }
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-medium transition-all hover:brightness-[0.96] active:scale-[0.97] disabled:opacity-40"
                 style={{
-                  background: C.bgButton,
-                  border: `1.5px solid ${C.border}`,
-                  color: C.text,
+                  background: showBinOnly ? "rgba(239,68,68,0.15)" : C.bgButton,
+                  border: `1.5px solid ${showBinOnly ? "rgb(239,68,68)" : C.border}`,
+                  color: showBinOnly ? "rgb(239,68,68)" : C.text,
                   boxShadow: C.shadow,
-                  transition: "background 0.35s, border 0.35s",
                 }}
               >
-                ♪ My Playlist
-                {playlist.length > 0 && (
-                  <span
-                    className="flex items-center justify-center text-[10px] font-bold"
+                {showBinOnly ? "⬅ Back" : `🗑 Bin (${binnedTrackIds.length})`}
+              </button>
+
+              {!showBinOnly && (
+                <>
+                  <button
+                    onClick={() => setDrawerOpen(true)}
+                    className="relative flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-medium transition-all hover:brightness-[0.96] active:scale-[0.97]"
                     style={{
-                      background: C.accent,
-                      color: "white",
-                      width: 17,
-                      height: 17,
-                      borderRadius: "50%",
-                      lineHeight: 1,
+                      background: C.bgButton,
+                      border: `1.5px solid ${C.border}`,
+                      color: C.text,
+                      boxShadow: C.shadow,
+                      transition: "background 0.35s, border 0.35s",
                     }}
                   >
-                    {playlist.length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={getFreshSet}
-                disabled={loading}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-all hover:brightness-[0.96] active:scale-[0.97] disabled:opacity-40"
-                style={{
-                  background: C.bgButton,
-                  border: `1.5px solid ${C.border}`,
-                  color: C.text,
-                  boxShadow: C.shadow,
-                  transition: "background 0.35s, border 0.35s",
-                }}
-              >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 14 14"
-                  fill="none"
-                  style={{ flexShrink: 0 }}
-                >
-                  <path
-                    d="M12.5 2.5A6.5 6.5 0 1 0 13 7"
-                    stroke={C.accent}
-                    strokeWidth="1.7"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M10 2.5h2.5V5"
-                    stroke={C.accent}
-                    strokeWidth="1.7"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                Get Fresh Set
-              </button>
+                    ♪ My Playlist
+                    {playlist.length > 0 && (
+                      <span
+                        className="flex items-center justify-center text-[10px] font-bold"
+                        style={{
+                          background: C.accent,
+                          color: "white",
+                          width: 17,
+                          height: 17,
+                          borderRadius: "50%",
+                          lineHeight: 1,
+                        }}
+                      >
+                        {playlist.length}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={getFreshSet}
+                    disabled={loading}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-all hover:brightness-[0.96] active:scale-[0.97] disabled:opacity-40"
+                    style={{
+                      background: C.bgButton,
+                      border: `1.5px solid ${C.border}`,
+                      color: C.text,
+                      boxShadow: C.shadow,
+                      transition: "background 0.35s, border 0.35s",
+                    }}
+                  >
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 14 14"
+                      fill="none"
+                      style={{ flexShrink: 0 }}
+                    >
+                      <path
+                        d="M12.5 2.5A6.5 6.5 0 1 0 13 7"
+                        stroke={C.accent}
+                        strokeWidth="1.7"
+                        strokeLinecap="round"
+                      />
+                      <path
+                        d="M10 2.5h2.5V5"
+                        stroke={C.accent}
+                        strokeWidth="1.7"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    Get Fresh Set
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
-          {/* Grid */}
+          {/* Grid Layout Canvas */}
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
               {Array.from({ length: PAGE_SIZE }).map((_, i) => (
                 <SkeletonCard key={i} C={C} />
               ))}
             </div>
-          ) : gridStatus !== null ? (
+          ) : gridStatus !== null && !showBinOnly ? (
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1408,18 +1522,50 @@ export default function Home() {
                 </>
               )}
             </motion.div>
+          ) : showBinOnly && displayTracks.length === 0 ? (
+            <div
+              className="flex flex-col items-center justify-center text-center py-24 px-8 rounded-2xl"
+              style={{
+                border: `1.5px dashed ${C.border}`,
+                background: C.bgCard,
+                minHeight: 320,
+              }}
+            >
+              <p style={{ fontSize: "2rem", marginBottom: 12 }}>♻️</p>
+              <p
+                style={{
+                  fontFamily: "'Playfair Display', serif",
+                  fontSize: "1.2rem",
+                  fontWeight: 700,
+                  color: C.text,
+                  marginBottom: 8,
+                }}
+              >
+                Your Trash Bin is clean
+              </p>
+              <p
+                style={{
+                  color: C.textMuted,
+                  fontSize: "0.85rem",
+                  maxWidth: 280,
+                }}
+              >
+                Removed songs from your discovery streams will build up here for
+                review or restoration.
+              </p>
+            </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
               <AnimatePresence mode="popLayout">
-                {tracks.map((song, idx) => (
+                {displayTracks.map((song, idx) => (
                   <motion.div
                     key={`${song.spotifyId ?? song.title}-${song.artist}-${idx}`}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.94 }}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.92 }}
                     transition={{
-                      duration: 0.22,
-                      delay: idx * 0.025,
+                      duration: 0.2,
+                      delay: idx * 0.02,
                       ease: [0.22, 1, 0.36, 1],
                     }}
                     layout
@@ -1427,8 +1573,12 @@ export default function Home() {
                     <SongCard
                       song={song}
                       C={C}
+                      isBinView={showBinOnly}
                       onHeard={() => markHeard(song)}
                       onAdd={() => addToPlaylist(song)}
+                      onToggleBin={() =>
+                        toggleTrackBinState(song.spotifyId || "")
+                      }
                     />
                   </motion.div>
                 ))}
