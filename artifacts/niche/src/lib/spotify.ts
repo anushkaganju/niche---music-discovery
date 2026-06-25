@@ -91,10 +91,6 @@ function getGradient(seed: string, index: number): string {
   return pool[index % pool.length];
 }
 
-// Widened slightly from the original ranges — the old "Hidden Gems" band
-// (0–14) was so narrow that, combined with a strict search query, it
-// frequently returned zero matches. 0–20 keeps the spirit of "obscure" while
-// giving the search enough room to actually return something.
 const OBSCURITY_RANGES = [
   { min: 50, max: 100 },
   { min: 18, max: 49 },
@@ -122,10 +118,6 @@ interface SpotifyPlaylistResponse {
 }
 
 // ── Curated playlists ──────────────────────────────────────────────────────────
-// Only genre+obscurity (+optional language) combos listed here pull from your
-// own playlists. Any combo NOT listed (e.g. Rock "Hidden Gems", R&B, Jazz,
-// any custom-typed genre) intentionally falls through to a live Spotify
-// search instead — that's expected, not a bug.
 const CURATED_PLAYLISTS: Record<string, string> = {
   // Indie — general
   "Indie-0": "3V5BrJv7p0rfkO1X7NzLOv", // Familiar
@@ -171,10 +163,6 @@ function getCuratedPlaylistId(
   if (CURATED_PLAYLISTS[generalKey]) {
     return CURATED_PLAYLISTS[generalKey];
   }
-  // No playlist curated for this exact combo — return null so
-  // fetchSpotifyPool falls through to a live Spotify search instead. This is
-  // intentional: genres/levels you haven't curated should come straight
-  // from Spotify, not from a mismatched playlist.
   return null;
 }
 
@@ -186,14 +174,6 @@ function buildQuery(genre: string, language: string): string {
   if (language && language !== "All") {
     return `genre:"${seed}" "${language}"`;
   }
-
-  // Previously this stacked three NOT clauses onto the genre filter
-  // (`NOT "Hindi" NOT "Bollywood" NOT "Punjabi"`), which is the kind of
-  // compound query Spotify's search frequently returns near-zero or zero
-  // results for — that's what was causing "No tracks found" for plenty of
-  // genre/obscurity combos. Just searching the genre tag is far more
-  // reliable; language filtering is handled by the explicit-language branch
-  // above when the person actually picks a language.
   return `genre:"${seed}"`;
 }
 
@@ -219,7 +199,7 @@ async function fetchTracksFromPlaylist(
   seed: string,
   accessToken: string,
 ): Promise<SpotifyTrack[] | null> {
-  const url = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`;
+  const url = `https://api.spotify.com/v1/playlists/$${playlistId}/tracks?limit=50`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -230,9 +210,7 @@ async function fetchTracksFromPlaylist(
 
   if (res.status === 403 || res.status === 404) {
     console.warn(
-      `[niche] Playlist ${playlistId} restricted or unavailable (${res.status}). ` +
-        `Check that the playlist is set to Public in Spotify, and that the ` +
-        `connected account's token includes playlist read scopes. Falling back to search.`,
+      `[niche] Playlist ${playlistId} restricted or unavailable (${res.status}). Falling back to search.`,
     );
     return null;
   }
@@ -251,7 +229,7 @@ async function fetchTracksFromPlaylist(
 
   if (valid.length === 0) {
     console.warn(
-      `[niche] Playlist ${playlistId} returned 0 usable tracks (empty or all missing artwork). Falling back to search.`,
+      `[niche] Playlist ${playlistId} returned 0 usable tracks. Falling back to search.`,
     );
     return null;
   }
@@ -281,11 +259,8 @@ async function fetchTracksFromSearch(
 
   for (let p = 0; p < PAGES; p++) {
     const pageOffset = baseOffset + p * SEARCH_LIMIT;
-    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=${SEARCH_LIMIT}&offset=${pageOffset}&market=US`;
+    const url = `https://api.spotify.com/v1/search?q=$${encodeURIComponent(q)}&type=track&limit=${SEARCH_LIMIT}&offset=${pageOffset}&market=US`;
 
-    // Transient 5xx errors (502/503/504) from Spotify get a couple of quick
-    // retries before giving up — a single hiccup shouldn't blank the whole
-    // grid. 401/403 are not retried since retrying won't help.
     let res: Response | null = null;
     let lastErrBody = "";
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -332,8 +307,6 @@ async function fetchTracksFromSearch(
   const withObscurity = valid.filter(
     (t) => t.popularity >= min && t.popularity <= max,
   );
-  // If the obscurity-filtered slice is too thin, fall back to whatever the
-  // genre search returned overall rather than showing an empty grid.
   const source = withObscurity.length >= 4 ? withObscurity : valid;
 
   if (source.length === 0) {
@@ -398,7 +371,7 @@ export async function createSpotifyPlaylist(
   name: string,
 ): Promise<{ id: string; url: string }> {
   const res = await fetch(
-    `https://api.spotify.com/v1/users/${userId}/playlists`,
+    `https://api.spotify.com/v1/users/$${userId}/playlists`,
     {
       method: "POST",
       headers: {
@@ -431,7 +404,7 @@ export async function addTracksToPlaylist(
   for (let i = 0; i < uris.length; i += 100) {
     const chunk = uris.slice(i, i + 100);
     const res = await fetch(
-      `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
+      `https://api.spotify.com/v1/playlists/$${playlistId}/tracks`,
       {
         method: "POST",
         headers: {
