@@ -82,6 +82,7 @@ const OBSCURITY_LABELS = ["Familiar", "A Bit Niche", "Hidden Gems"];
 const TRANSPARENT_PIXEL =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 const PAGE_SIZE = 10;
+const BIN_STORAGE_KEY = "niche_binned_tracks";
 
 // ── Audio singleton ────────────────────────────────────────────────────────────
 let _audio: HTMLAudioElement | null = null;
@@ -687,9 +688,21 @@ export default function Home() {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // ── 🗑️ Trash Bin Core States ────────────────────────────────────────────────
+  // Safely parsed: malformed/corrupted localStorage data no longer crashes
+  // the app on load — it just resets the bin and logs a warning.
   const [binnedTrackIds, setBinnedTrackIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem("niche_binned_tracks");
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem(BIN_STORAGE_KEY);
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed)
+        ? parsed.filter(
+            (id): id is string => typeof id === "string" && id.length > 0,
+          )
+        : [];
+    } catch (e) {
+      console.warn("[niche] Failed to parse stored bin state, resetting.", e);
+      return [];
+    }
   });
   const [showBinOnly, setShowBinOnly] = useState<boolean>(false);
 
@@ -859,7 +872,16 @@ export default function Home() {
   };
 
   // ── 🗑️ Trash Bin Operation Handlers ────────────────────────────────────────
-  const toggleTrackBinState = (trackId: string) => {
+  // Guards against empty/undefined spotifyId so distinct ID-less tracks never
+  // collapse into a single "" bin entry, and wraps the localStorage write in
+  // a try/catch so a full or disabled storage quota doesn't crash the app.
+  const toggleTrackBinState = (trackId: string | undefined) => {
+    if (!trackId) {
+      console.warn(
+        "[niche] Attempted to bin a track with no spotifyId — skipping.",
+      );
+      return;
+    }
     let updated: string[];
     if (binnedTrackIds.includes(trackId)) {
       updated = binnedTrackIds.filter((id) => id !== trackId);
@@ -867,12 +889,18 @@ export default function Home() {
       updated = [...binnedTrackIds, trackId];
     }
     setBinnedTrackIds(updated);
-    localStorage.setItem("niche_binned_tracks", JSON.stringify(updated));
+    try {
+      localStorage.setItem(BIN_STORAGE_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.warn("[niche] Failed to persist bin state to localStorage.", e);
+    }
   };
 
-  // Filter local render pools dynamically based on Bin Toggle context
+  // Filter local render pools dynamically based on Bin Toggle context.
+  // Tracks without a spotifyId are never treated as binned, so they can't
+  // be hidden by an unrelated bin entry.
   const filteredTracks = tracks.filter((t) => {
-    const isBinned = binnedTrackIds.includes(t.spotifyId || "");
+    const isBinned = !!t.spotifyId && binnedTrackIds.includes(t.spotifyId);
     return showBinOnly ? isBinned : !isBinned;
   });
 
@@ -1576,9 +1604,7 @@ export default function Home() {
                       isBinView={showBinOnly}
                       onHeard={() => markHeard(song)}
                       onAdd={() => addToPlaylist(song)}
-                      onToggleBin={() =>
-                        toggleTrackBinState(song.spotifyId || "")
-                      }
+                      onToggleBin={() => toggleTrackBinState(song.spotifyId)}
                     />
                   </motion.div>
                 ))}
