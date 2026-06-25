@@ -4,9 +4,16 @@ const CLIENT_ID: string =
   (import.meta.env.VITE_SPOTIFY_CLIENT_ID as string | undefined) ??
   "77f5f74668bd46a285eb2051f1938855";
 
+// Added playlist-read-private and playlist-read-collaborative — without
+// these, fetching your curated playlists' tracks can silently 403 unless
+// every single one is set to fully "Public" on Spotify. The modify scopes
+// alone only cover creating/adding to playlists for the "Export to Spotify"
+// feature, not reading from your curated ones.
 const SCOPES = [
   "user-read-private",
   "user-read-email",
+  "playlist-read-private",
+  "playlist-read-collaborative",
   "playlist-modify-public",
   "playlist-modify-private",
 ].join(" ");

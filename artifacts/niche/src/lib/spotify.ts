@@ -91,10 +91,14 @@ function getGradient(seed: string, index: number): string {
   return pool[index % pool.length];
 }
 
+// Widened slightly from the original ranges — the old "Hidden Gems" band
+// (0–14) was so narrow that, combined with a strict search query, it
+// frequently returned zero matches. 0–20 keeps the spirit of "obscure" while
+// giving the search enough room to actually return something.
 const OBSCURITY_RANGES = [
   { min: 50, max: 100 },
-  { min: 15, max: 49 },
-  { min: 0, max: 14 },
+  { min: 18, max: 49 },
+  { min: 0, max: 20 },
 ];
 
 interface SpotifySearchTrack {
@@ -118,6 +122,10 @@ interface SpotifyPlaylistResponse {
 }
 
 // ── Curated playlists ──────────────────────────────────────────────────────────
+// Only genre+obscurity (+optional language) combos listed here pull from your
+// own playlists. Any combo NOT listed (e.g. Rock "Hidden Gems", R&B, Jazz,
+// any custom-typed genre) intentionally falls through to a live Spotify
+// search instead — that's expected, not a bug.
 const CURATED_PLAYLISTS: Record<string, string> = {
   // Indie — general
   "Indie-0": "3V5BrJv7p0rfkO1X7NzLOv", // Familiar
@@ -160,7 +168,14 @@ function getCuratedPlaylistId(
     return CURATED_PLAYLISTS[languageKey];
   }
   const generalKey = `${genre}-${obscurity}`;
-  return CURATED_PLAYLISTS[generalKey] ?? null;
+  if (CURATED_PLAYLISTS[generalKey]) {
+    return CURATED_PLAYLISTS[generalKey];
+  }
+  // No playlist curated for this exact combo — return null so
+  // fetchSpotifyPool falls through to a live Spotify search instead. This is
+  // intentional: genres/levels you haven't curated should come straight
+  // from Spotify, not from a mismatched playlist.
+  return null;
 }
 
 function buildQuery(genre: string, language: string): string {
@@ -172,8 +187,14 @@ function buildQuery(genre: string, language: string): string {
     return `genre:"${seed}" "${language}"`;
   }
 
-  // Stricter parameters to stop language leakage during English/All searches
-  return `genre:"${seed}" NOT "Hindi" NOT "Bollywood" NOT "Punjabi"`;
+  // Previously this stacked three NOT clauses onto the genre filter
+  // (`NOT "Hindi" NOT "Bollywood" NOT "Punjabi"`), which is the kind of
+  // compound query Spotify's search frequently returns near-zero or zero
+  // results for — that's what was causing "No tracks found" for plenty of
+  // genre/obscurity combos. Just searching the genre tag is far more
+  // reliable; language filtering is handled by the explicit-language branch
+  // above when the person actually picks a language.
+  return `genre:"${seed}"`;
 }
 
 function mapSearchTrack(
@@ -209,7 +230,9 @@ async function fetchTracksFromPlaylist(
 
   if (res.status === 403 || res.status === 404) {
     console.warn(
-      `[niche] Playlist ${playlistId} restricted or unavailable (${res.status}). Falling back to search.`,
+      `[niche] Playlist ${playlistId} restricted or unavailable (${res.status}). ` +
+        `Check that the playlist is set to Public in Spotify, and that the ` +
+        `connected account's token includes playlist read scopes. Falling back to search.`,
     );
     return null;
   }
@@ -225,6 +248,13 @@ async function fetchTracksFromPlaylist(
     .filter(
       (t): t is SpotifySearchTrack => t !== null && t.album?.images?.length > 0,
     );
+
+  if (valid.length === 0) {
+    console.warn(
+      `[niche] Playlist ${playlistId} returned 0 usable tracks (empty or all missing artwork). Falling back to search.`,
+    );
+    return null;
+  }
 
   const shuffled = valid.slice().sort(() => Math.random() - 0.5);
   return shuffled.map((track, i) => mapSearchTrack(track, seed, i));
@@ -251,7 +281,7 @@ async function fetchTracksFromSearch(
 
   for (let p = 0; p < PAGES; p++) {
     const pageOffset = baseOffset + p * SEARCH_LIMIT;
-    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=${SEARCH_LIMIT}&offset=${pageOffset}`;
+    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=${SEARCH_LIMIT}&offset=${pageOffset}&market=US`;
 
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -280,7 +310,15 @@ async function fetchTracksFromSearch(
   const withObscurity = valid.filter(
     (t) => t.popularity >= min && t.popularity <= max,
   );
+  // If the obscurity-filtered slice is too thin, fall back to whatever the
+  // genre search returned overall rather than showing an empty grid.
   const source = withObscurity.length >= 4 ? withObscurity : valid;
+
+  if (source.length === 0) {
+    console.warn(
+      `[niche] Search for "${q}" (offset ${baseOffset}) returned 0 usable tracks.`,
+    );
+  }
 
   const shuffled = source.slice().sort(() => Math.random() - 0.5);
   return shuffled.map((track, i) => mapSearchTrack(track, seed, i));
