@@ -283,18 +283,40 @@ async function fetchTracksFromSearch(
     const pageOffset = baseOffset + p * SEARCH_LIMIT;
     const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=${SEARCH_LIMIT}&offset=${pageOffset}&market=US`;
 
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    // Transient 5xx errors (502/503/504) from Spotify get a couple of quick
+    // retries before giving up — a single hiccup shouldn't blank the whole
+    // grid. 401/403 are not retried since retrying won't help.
+    let res: Response | null = null;
+    let lastErrBody = "";
+    for (let attempt = 0; attempt < 3; attempt++) {
+      res = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
 
-    if (res.status === 401 || res.status === 403) {
-      throw new SpotifyAuthError(res.status);
+      if (res.status === 401 || res.status === 403) {
+        throw new SpotifyAuthError(res.status);
+      }
+
+      if (res.ok) break;
+
+      if (res.status >= 500 && res.status < 600 && attempt < 2) {
+        lastErrBody = await res.text();
+        console.warn(
+          `[niche] Spotify search returned ${res.status} (attempt ${attempt + 1}/3), retrying…`,
+        );
+        await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+        continue;
+      }
+
+      break;
     }
 
-    if (!res.ok) {
-      const body = await res.text();
+    if (!res || !res.ok) {
+      const body = res
+        ? await res.text().catch(() => lastErrBody)
+        : lastErrBody;
       if (p === 0) {
-        throw new Error(`Spotify Search ${res.status}: ${body}`);
+        throw new Error(`Spotify Search ${res?.status ?? "failed"}: ${body}`);
       }
       break;
     }
