@@ -12,6 +12,16 @@
 
 ---
 
+
+## 🔒 Spotify Developer Sandbox Note
+
+Because this app connects directly to live production endpoints on the official Spotify Web API, it currently runs in a secure developer sandbox environment. 
+
+- **If you are reviewing this project and want to test it live with your personal streaming account**, please reach out with your Spotify login email, and I will whitelist your account access instantly!
+- Otherwise, please check out the live preview animation at the top of this file to see the frontend state filtering and audio engines in action.
+
+---
+
 ##  Features That Make it Special
 
 * **Hand-Curated Handshakes:** Directly routes your dashboard grids to public playlists tailored by Genre, Language, and Obscurity level—curating real human taste.
