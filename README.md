@@ -14,10 +14,10 @@
 
 ##  Features That Make it Special
 
-* ** Hand-Curated Handshakes:** Directly routes your dashboard grids to public playlists tailored by Genre, Language, and Obscurity level—curating real human taste.
-* ** Bulletproof Fallback Search:** If a unique category combination isn't curated yet, the system smoothly falls back to a smart, paginated global live search index so your discovery loop never breaks.
-* ** Persistent Trash Bin:** Tired of random tracks ruining the vibe? Hit the `×` button to drop a track into your persistent storage bin. It saves to your browser automatically so binned tracks stay hidden even after a refresh.
-* ** Secure Connection:** Connects instantly using standard Spotify OAuth with PKCE verification, keeping your session fully synchronized and encrypted.
+* **Hand-Curated Handshakes:** Directly routes your dashboard grids to public playlists tailored by Genre, Language, and Obscurity level—curating real human taste.
+* **Bulletproof Fallback Search:** If a unique category combination isn't curated yet, the system smoothly falls back to a smart, paginated global live search index so your discovery loop never breaks.
+* **Persistent Trash Bin:** Tired of random tracks ruining the vibe? Hit the `×` button to drop a track into your persistent storage bin. It saves to your browser automatically so binned tracks stay hidden even after a refresh.
+* **Secure Connection:** Connects instantly using standard Spotify OAuth with PKCE verification, keeping your session fully synchronized and encrypted.
 
 
 ---
