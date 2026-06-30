@@ -29,6 +29,16 @@ Because this app connects directly to live production endpoints on the official 
 * **Persistent Trash Bin:** Tired of random tracks ruining the vibe? Hit the `×` button to drop a track into your persistent storage bin. It saves to your browser automatically so binned tracks stay hidden even after a refresh.
 * **Secure Connection:** Connects instantly using standard Spotify OAuth with PKCE verification, keeping your session fully synchronized and encrypted.
 
+---
+
+## Curation Boundaries & Future Enhancements
+
+While the dashboard framework, PKCE auth flow, and dynamic audio engines are fully stable, music metadata sync introduces a few natural platform limits:
+
+1. **Strict Local Bin Lifecycle**: The Trash Bin safely retains track IDs inside `localStorage`. However, because fresh database queries pull localized sets from Spotify's live endpoints, previously binned tracks will only display in the Bin archive if they happen to appear in the active API fetch pool.
+2. **Spotify Search Parameter Tagging**: When cross-filtering complex matches (e.g., `Jazz` + `Japanese`), results depend entirely on how Spotify indexes track metadata. If explicit metadata matches are too narrow, the network fallbacks prioritize core genre filters to ensure the dashboard UI never serves an empty grid.
+
+*Planned Update: Building a localized database cache to permanently map and store historical track payloads for binned items across active sessions.*
 
 ---
 
