@@ -32,9 +32,9 @@ Because this app connects directly to live production endpoints on the official 
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
-### 1. Clone & Install
+### Clone & Install
 ```bash
 git clone [https://github.com/anushkaganju/music-discovery-hub.git](https://github.com/anushkaganju/music-discovery-hub.git)
 cd music-discovery-hub
