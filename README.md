@@ -1,0 +1,31 @@
+#  niche
+
+### *Music made for you, not the algorithm.*
+
+[![React](https://img.shields.io/badge/React-18-blue?logo=react&logoColor=white)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-Fast-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-Aesthetic-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Spotify API](https://img.shields.io/badge/Spotify-API_Integrated-1DB954?logo=spotify&logoColor=white)](https://developer.spotify.com/)
+
+**niche** is a minimalist, aesthetic discovery dashboard that puts music curation back into human hands. By pairing custom layout engines with the official Spotify Web API, it lets you bypass automated corporate feeds, explore handcrafted vibes, filter out the noise with an interactive Trash Bin, and export your personal collections instantly.
+
+---
+
+##  Features That Make it Special
+
+* ** Hand-Curated Handshakes:** Directly routes your dashboard grids to public playlists tailored by Genre, Language, and Obscurity level—curating real human taste.
+* ** Bulletproof Fallback Search:** If a unique category combination isn't curated yet, the system smoothly falls back to a smart, paginated global live search index so your discovery loop never breaks.
+* ** Persistent Trash Bin:** Tired of random tracks ruining the vibe? Hit the `×` button to drop a track into your persistent storage bin. It saves to your browser automatically so binned tracks stay hidden even after a refresh.
+* ** Secure Connection:** Connects instantly using standard Spotify OAuth with PKCE verification, keeping your session fully synchronized and encrypted.
+
+
+---
+
+## 🚀 Quick Start
+
+### 1. Clone & Install
+```bash
+git clone [https://github.com/anushkaganju/music-discovery-hub.git](https://github.com/anushkaganju/music-discovery-hub.git)
+cd music-discovery-hub
+npm install
