@@ -1,16 +1,13 @@
 #  niche
 ### *Music made for you, not the algorithm.*
 
-
-https://github.com/user-attachments/assets/eb8fbb1e-e377-498e-890e-5856e959ff95
-
-
 [![React](https://img.shields.io/badge/React-18-blue?logo=react&logoColor=white)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-Fast-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-Aesthetic-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Spotify API](https://img.shields.io/badge/Spotify-API_Integrated-1DB954?logo=spotify&logoColor=white)](https://developer.spotify.com/)
 
+https://github.com/user-attachments/assets/eb8fbb1e-e377-498e-890e-5856e959ff95
 
 **niche** is a minimalist, aesthetic discovery dashboard that puts music curation back into human hands. By pairing custom layout engines with the official Spotify Web API, it lets you bypass automated corporate feeds, explore handcrafted vibes, filter out the noise with an interactive Trash Bin, and export your personal collections instantly.
 
