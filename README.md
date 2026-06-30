@@ -13,7 +13,7 @@
 ---
 
 
-## 🔒 Spotify Developer Sandbox Note
+## Spotify Developer Sandbox Note
 
 Because this app connects directly to live production endpoints on the official Spotify Web API, it currently runs in a secure developer sandbox environment. 
 
