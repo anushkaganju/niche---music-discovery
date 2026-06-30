@@ -1,7 +1,9 @@
 #  niche
-<img width="800" height="450" alt="niche-demo gif" src="https://github.com/user-attachments/assets/7d9d5eb1-0955-4fb0-a494-053694f8ccfe" />
-
 ### *Music made for you, not the algorithm.*
+
+
+https://github.com/user-attachments/assets/eb8fbb1e-e377-498e-890e-5856e959ff95
+
 
 [![React](https://img.shields.io/badge/React-18-blue?logo=react&logoColor=white)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
